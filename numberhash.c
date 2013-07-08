@@ -12,7 +12,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#ifdef SSLSHA1
 #include <openssl/sha.h>
+#endif
 
 #define MAXLEN	50
 #define DISTMAX	30
@@ -129,6 +131,7 @@ unsigned long hashKR (unsigned char b[], int l) {
 }
 
 unsigned long SHA1hash (unsigned char b[], int l) {
+#ifdef SSLSHA1
 	unsigned char md[SHA_DIGEST_LENGTH];
 	union {
 		long h;
@@ -148,6 +151,9 @@ unsigned long SHA1hash (unsigned char b[], int l) {
 
 	if (u.h < 0) u.h = -u.h;
 	return u.h;
+#else
+	return 0;
+#endif
 }
 
 unsigned long digitmod (unsigned char b[], int l) {
