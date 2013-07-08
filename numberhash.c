@@ -98,10 +98,19 @@ int myrand (void) {
 	return (r % 10);
 }
 
+int skewedrand (void) {
+	static int m=0, r=0;
+
+	r = (m == 0) ? (int)random() : r/10;	// shift thru digits
+	if (r > 4) r /= 2;
+	m = (m + 1) % 8;
+	return (r % 6);
+}
+
 unsigned long hashKR (unsigned char b[], int l) {
 	int i;
 	unsigned long h = 0;	//5381;
-	for (i=0; i<l; ++i) {
+	for (i=0; b[i] && i<l; ++i) {
 		h = 31 * h + b[i];	// Kernighan & Ritchie
 		//h = 2 * h + c * c;	// from migration design doc
 		//h = 10 * h +  (b[i] - '0');
@@ -144,7 +153,7 @@ unsigned long SHA1hash (unsigned char b[], int l) {
 unsigned long digitmod (unsigned char b[], int l) {
 	int i;
 	unsigned long h = 0;
-	for (i=0; i<l; ++i)
+	for (i=0; b[i] && i<l; ++i)
 		h = 10*h + b[i];
 	return h;
 }
@@ -152,7 +161,7 @@ unsigned long digitmod (unsigned char b[], int l) {
 unsigned long hashDesign (unsigned char b[], int l) {
 	int i;
 	unsigned long h = 0;	//5381;
-	for (i=0; i<l; ++i) {
+	for (i=0; b[i] && i<l; ++i) {
 		h = 2 * h + b[i] * b[i];// from migration design doc
 		h %= 16777213;		// so that COBOL does not overflow
 		if (h < 0) printf("for-loop hashDesign: h=%ld\n", h);
@@ -169,6 +178,11 @@ unsigned long hashDesign (unsigned char b[], int l) {
 }
 
 
+int (*randf[]) (void) = {
+	&myrand,
+	&skewedrand
+};
+
 unsigned long (*hf[]) (unsigned char b[], int l) = {
 	&hashKR,
 	&SHA1hash,
@@ -178,18 +192,22 @@ unsigned long (*hf[]) (unsigned char b[], int l) = {
 
 
 int main (int argc, char *argv[]) {
-	FILE *fp;	// filepointer to /dev/urandom
-	int prtflag = 0, found;
-	int c, i, hfnum=0, l=10, ncol=0, distr[DISTMAX];
+	FILE *fp;	// filepointer to either /dev/urandom or file with data
+	char *fname = "";
+	int ebcdic=0, prtflag = 0, found;
+	int c, i, hfnum=0, l=10, ncol=0, distr[DISTMAX],rnd=0;
 	unsigned char b[MAXLEN];
-	long h, hashsize=11, k, n=5, n0;
+	long h, hashsize=11, k, n=5, ni;
 	struct hashtable {
 		int coll;	// number of collisions
 		unsigned char b[MAXLEN];	// value element of hash
 	} *ht;
 
-	while ((c = getopt(argc,argv,"f:h:l:n:pt")) != -1) {
+	while ((c = getopt(argc,argv,"ef:h:i:l:n:pr:t")) != -1) {
 		switch (c) {
+		case 'e':
+			ebcdic = 1;
+			break;
 		case 'f':	// hash function
 			hfnum = atoi(optarg);
 			if (hfnum < 0 || hfnum >= sizeof(hf)/sizeof(hf[0])) {
@@ -201,51 +219,88 @@ int main (int argc, char *argv[]) {
 		case 'h':	// max hashtable size
 			hashsize = atol(optarg);
 			break;
+		case 'i':	// max hashtable size
+			fname = optarg;
+			if (fname[0] == '\0') {
+				printf("%s: file name seems to be empty\n",
+					argv[0]);
+				return 2;
+			}
+			break;
 		case 'l':	// length, default is 10
 			l = atoi(optarg);
-			if (l < 1 || l > 40) {
-				printf("%s: limit l must be in [1...40]\n",argv[0]);
-				return 2;
+			if (l < 1 || l > MAXLEN-2) {
+				printf("%s: limit l must be in [1...%d], l=%d\n",
+					argv[0], MAXLEN-2,l);
+				return 3;
 			}
 			break;
 		case 'n':	// number of random numbers to generate
 			n = atol(optarg);
+			if (n < 0) {
+				printf("%s: number of random numbers negative, %ld\n",
+					argv[0], n);
+				return 4;
+			}
 			break;
 		case 'p':
 			prtflag = 1;
 			break;
+		case 'r':
+			rnd = atoi(optarg);
+			if (rnd < 0 || rnd >= sizeof(randf)/sizeof(randf[0])) {
+				printf("%s: illegal random function number %d\n",
+					argv[0], rnd);
+				return 5;
+			}
+			break;
 		default:
 			printf("%s: unknown flag %c\n",argv[0],c);
-			return 3;
+			return 6;
 		}
 	}
 
-	if ((fp = fopen("/dev/urandom","r")) == NULL) {
-		printf("%s: cannot open /dev/urandom, %s\n",
-			argv[0], strerror(errno));
-		return 4;
-	}
-	srandom(fgetc(fp) * 256 + fgetc(fp));
+	if (fname[0] == '\0') {
+		if ((fp = fopen("/dev/urandom","r")) == NULL) {
+			printf("%s: cannot open /dev/urandom, %s\n",
+				argv[0], strerror(errno));
+			return 7;
+		}
+		srandom(fgetc(fp) * 256 + fgetc(fp));
 
-	if (fclose(fp) != 0) {
-		printf("%s: cannot close /dev/urandom, %s\n",
-			argv[0], strerror(errno));
-		return 5;
+		if (fclose(fp) != 0) {
+			printf("%s: cannot close /dev/urandom, %s\n",
+				argv[0], strerror(errno));
+			return 8;
+		}
+	} else {
+		if (fname[0] == '-')
+			fp = stdin;
+		else if ((fp = fopen(fname,"r")) == NULL) {
+			printf("%s: cannot open %s\n",
+				argv[0], fname);
+			return 9;
+		}
+		n = 32000001;
 	}
 
 	if ((ht = (struct hashtable*)calloc(hashsize,sizeof(struct hashtable))) == NULL) {
 		printf("%s: cannot allocate %ld slots for hash table\n",
 			argv[0], hashsize);
-		return 6;
+		return 10;
 	}
 
 	// Kernighan & Ritchie: M=31, Init=0
 	// Bernstein: M=33, Init=5381
 	printf("Number of random numbers: %ld, hash size = %ld\n", n, hashsize);
-	n0 = n;
-	while (n-- > 0) {
-		for (i=0; i<l; ++i)
-			b[i] = ascii_to_ebcdic['0' + myrand()];
+	for (ni=0; ni<n; ++ni) {
+		if (fname[0] == '\0') {
+			for (i=0; i<l; ++i)
+				b[i] = ascii_to_ebcdic['0' + (*randf[rnd])()];
+				if (ebcdic) b[i] = ascii_to_ebcdic[b[i]];
+		} else {
+			if (fgets(b,l+1,fp) == NULL) break;
+		}
 		h = (*hf[hfnum])(b,l);
 		//h = SHA1hash(b,l);
 		//h = digitmod(b,l);
@@ -270,14 +325,19 @@ int main (int argc, char *argv[]) {
 		}
 		if (found == 0) {
 			printf("Did not find: ");
-			for (i=0; i<l; ++i) putchar(ebcdic_to_ascii[b[i]]);
+			for (i=0; i<l; ++i) putchar(ebcdic ? ebcdic_to_ascii[b[i]] : b[i]);
 			puts("");
 		}
 
 		if (prtflag) {
-			for (i=0; i<l; ++i) putchar(ebcdic_to_ascii[b[i]]);
+			for (i=0; i<l; ++i) putchar(ebcdic ? ebcdic_to_ascii[b[i]] : b[i]);
 			printf(", %8ld, %6d, %4d\n", h, ht[h].coll, ncol);
 		}
+	}
+
+	if (fname[0] != '\0'  &&  fp != stdin) {
+		if (fclose(fp) != 0) printf("%s: cannot close %s\n",
+			argv[0], fname);
 	}
 
 	// Calculate distribution
@@ -289,7 +349,7 @@ int main (int argc, char *argv[]) {
 
 	printf("Total number of collisions: %d = %f%%, "
 		"load factor: %f\n",
-		ncol, 100.0*ncol/n0, 100.0*n0 / hashsize);
+		ncol, 100.0*ncol/ni, 100.0*ni / hashsize);
 	for (i=0; i<DISTMAX; ++i)
 		printf("%2d %8d   %.2f\n", i, distr[i], 100.0*distr[i]/hashsize);
 
