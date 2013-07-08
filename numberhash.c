@@ -199,7 +199,7 @@ unsigned long (*hf[]) (unsigned char b[], int l) = {
 
 int main (int argc, char *argv[]) {
 	FILE *fp;	// filepointer to either /dev/urandom or file with data
-	char *fname = "";
+	char buf[256], *fname = "";
 	int ebcdic=0, prtflag = 0, found;
 	int c, i, hfnum=0, l=10, ncol=0, distr[DISTMAX],rnd=0;
 	unsigned char b[MAXLEN];
@@ -305,7 +305,8 @@ int main (int argc, char *argv[]) {
 				b[i] = ascii_to_ebcdic['0' + (*randf[rnd])()];
 				if (ebcdic) b[i] = ascii_to_ebcdic[b[i]];
 		} else {
-			if (fgets(b,l+1,fp) == NULL) break;
+			if (fgets(buf,255,fp) == NULL) break;
+			strncpy(b,buf,l);	// we do not need '\0' at end
 		}
 		h = (*hf[hfnum])(b,l);
 		//h = SHA1hash(b,l);
