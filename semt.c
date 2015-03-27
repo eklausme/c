@@ -1,7 +1,7 @@
 //#!/home/edh/bin/ctorun
 // This Program was written by Gordian Edenhofer on 04.05.14
 // It is licensed under the Creative Commons Attribution-ShareAlike 3.0 Unported License.
-// Simple EDID Manipulation Tool
+// Simple Edit Manipulation Tool
 // How To:	semt [Inputfile] [X-Resolution] [Y-Resolution] [Outputfile] [Options]
 
 #include <stdio.h>
@@ -12,7 +12,7 @@
 int main(int argc, char *argv[]) {
 
 	int i, c, x_res, y_res, checksum = 0, debug=0;
-	unsigned char edid[127];
+	unsigned char edid[129];
 	FILE *fp;
 
 	while ((c = getopt(argc,argv,"dvh")) != -1) {
@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
 			"\tThe program was written and is maintained by Gordian Edenhofer.\n"
 			"\tFor further question concerning the program please contact me\n"
 			"\tvia <gordian.edenhofer@yahoo.de>\n\n"
-			"\tsemt - Simple EDID Manipulation Tool by Gordian Edenhofer\n"
+			"\tsemt - Simple Edit Manipulation Tool by Gordian Edenhofer\n"
 			"\tis licensed under the Creative Commons Attribution-ShareAlike 3.0\n"
 			"\tUnported License.\n");
 			return 0;
