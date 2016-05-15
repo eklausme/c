@@ -1,0 +1,58 @@
+Sub Hex2Ascii()
+    Dim ifile As String, ofile As String, i As Integer, cnt As Integer
+    Dim map(0 To 255) As Byte, a(0 To 1) As Byte, c As Byte
+    ifile = "D:\Users\eklausme\c\x9"
+    ofile = "D:\Users\eklausme\c\x9excel"
+    For i = 0 To 255
+        map(i) = 0
+    Next i
+    map(Asc("0")) = 0
+    map(Asc("1")) = 1
+    map(Asc("2")) = 2
+    map(Asc("3")) = 3
+    map(Asc("4")) = 4
+    map(Asc("5")) = 5
+    map(Asc("6")) = 6
+    map(Asc("7")) = 7
+    map(Asc("8")) = 8
+    map(Asc("9")) = 9
+    map(Asc("A")) = 10
+    map(Asc("B")) = 11
+    map(Asc("C")) = 12
+    map(Asc("D")) = 13
+    map(Asc("E")) = 14
+    map(Asc("F")) = 15
+    map(Asc("a")) = 10
+    map(Asc("b")) = 11
+    map(Asc("c")) = 12
+    map(Asc("d")) = 13
+    map(Asc("e")) = 14
+    map(Asc("f")) = 15
+
+    On Error Resume Next
+    If GetAttr(ofile) <> 0 Then
+        Kill ofile  ' delete file
+    End If
+    Open ifile For Binary Access Read As #1
+    Open ofile For Binary Access Write As #2
+
+    cnt = 0
+    i = 0
+    Get #1, , a(i)
+    Do While Not EOF(1)
+        If a(i) <> 32 And a(i) <> 13 And a(i) <> 9 And a(i) <> 10 Then
+            If i > 0 Then
+                cnt = cnt + 1
+                c = 16 * map(a(0)) + map(a(1))
+                Put #2, , c
+            End If
+            i = 1 - i
+        End If
+        Get #1, , a(i)
+    Loop
+    
+    Close #1
+    Close #2
+    MsgBox "cnt = " & cnt
+End Sub
+
