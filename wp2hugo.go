@@ -50,7 +50,7 @@ var delimList = []struct {
 	{ "$latex ", "$" },
 }
 func deHTMLify(s string) string {
-	// glitch for WordPress foolishly changing "&" to "&amp;"
+	// glitch for WordPress foolishly changing "&" to "&amp;", ">" to "&gt;", etc.
 	for _,v := range(delimList) {
 		tx0,tx1,lenvstart,lenvstop := 0,0,len(v.start),len(v.stop)
 		for {
@@ -89,13 +89,17 @@ var replaceList = []struct {
 	replace string
 }{
 	// convert [code lang=bash] to ```bash
-	{ regexp.MustCompile("(\n{0,1})\\[code\\s*lang(uage|)=(\"|)([A-Za-z\\+]+)(\"|).*\\]\\w*\n"), "\n```$4\n" },
+	{ regexp.MustCompile("(\n{0,1})\\[code\\s*lang(uage|)=(\"|)([A-Za-z\\+]+)(\"|)(.*)\\]\\w*\n"), "\n```$4$6\n" },
 	// convert [/code] to ```
 	{ regexp.MustCompile("\n\\[/code\\]\\s*\n"), "\n```\n" },
 	// handle https://www.youtube.com/watch?v=wtqfC9v0xB0
 	{ regexp.MustCompile("\nhttp(.|)://www\\.youtube\\.com/watch\\?v=(\\w+)(&.+|)\n"), "\n{{< youtube $2 >}}\n" },
 	// handle [youtube=http://www.youtube.com/watch?v=IA8X1cXFo9oautoplay=0&start=0&end=0]
 	{ regexp.MustCompile(`\[youtube=http(.|)://www\.youtube\.com/watch\?v=(\w+)(&.+|)\]`), "{{< youtube $2 >}}" },
+	// handle [vimeo 199882338]
+	{ regexp.MustCompile(`\[vimeo (\d\d\d+)\]`), "{{< vimeo $1 >}}" },
+	// handle [vimeo https://vimeo.com/167845464]
+	{ regexp.MustCompile(`\[vimeo http(.|)://vimeo\.com/(\d\d\d+)\]`), "{{< vimeo $2 >}}" },
 	// convert <code>, which is used as <pre>, to ```
 	{ regexp.MustCompile("\n<code>\\s*\n"), "\n```\n" },
 	// handle </code> which is used as </pre>
@@ -178,7 +182,7 @@ func wrtPostFile(frontmatter map[string]string, cats,tags map[int]string, body [
 	// create directory content/post, content/page, etc.
 	if os.MkdirAll(dirname,0775) != nil {
 		fmt.Println("Cannot create directory",dirname)
-		os.Exit(4)
+		os.Exit(11)
 	}
 
 	link := frontmatter["link"]
@@ -191,7 +195,7 @@ func wrtPostFile(frontmatter map[string]string, cats,tags map[int]string, body [
 			//fmt.Println("\t\tdirname =",dirname)
 			if len(dirname) > 0 && os.MkdirAll(dirname,0775) != nil {
 				fmt.Println("Cannot create directory",dirname)
-				os.Exit(5)
+				os.Exit(12)
 			}
 		}
 	}
@@ -201,7 +205,7 @@ func wrtPostFile(frontmatter map[string]string, cats,tags map[int]string, body [
 	fout,err := os.Create(fname)
 	if err != nil {
 		fmt.Println("Cannot open ",fname,"for writing")
-		os.Exit(2)
+		os.Exit(13)
 	}
 
 	bodyStr := string(body[0:bodyLen])
@@ -248,7 +252,7 @@ func wrtConfigToml(configCats map[int]string) {
 	fout,err := os.Create("config.toml")
 	if err != nil {
 		fmt.Println("Cannot open config.toml for writing")
-		os.Exit(3)
+		os.Exit(14)
 	}
 
 	//catLine := commaSep(configCats,"categories");
@@ -287,7 +291,7 @@ func wrtAttachm() {
 	fout,err := os.Create("attachm.txt")
 	if err != nil {
 		fmt.Println("Cannot open attachm.txt for writing")
-		os.Exit(4)
+		os.Exit(15)
 	}
 
 	w := bufio.NewWriter(fout)
@@ -497,7 +501,7 @@ func wp2hugo(finp *os.File) {
 func main() {
 	if len(os.Args) <= 1 {
 		fmt.Println("Expect at least one file-name as argument")
-		os.Exit(1)
+		os.Exit(16)
 	}
 
 	// WordPress export may contain multiple files
