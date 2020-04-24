@@ -103,13 +103,13 @@ create table Datebook (
 	RepeatEnd     text,            -- end date in format YYYY-MM-DD
 	RepeatFreq    int,
 	RepeatDay     int,
-	RepeatDay1    int,
-	RepeatDay2    int,
-	RepeatDay3    int,
-	RepeatDay4    int,
-	RepeatDay5    int,
-	RepeatDay6    int,
-	RepeatDay7    int,
+	RepeatDaySu   int,
+	RepeatDayMo   int,
+	RepeatDayTu   int,
+	RepeatDayWe   int,
+	RepeatDayTh   int,
+	RepeatDayFr   int,
+	RepeatDaySa   int,
 	Description   text,
 	Note          text
 );
