@@ -1,0 +1,72 @@
+--
+--       n Damen Problem loesen;
+--       DAMCOUNT;
+--       entworfen am 31.03.1985;
+--       geschrieben am 02.04.1985;
+--       revidiert am 18.04.1985 Do vorm.
+--
+--       in C++ umgewandelt am 17.04.1994
+--       in Lua umgewandelt am 28.04.2020
+--       in Pallene umgewandelt am 30.04.2020
+--
+--     2   4    6     8      10         12           14
+--   1 0 0 2 10 4 40 92 352 724 2680 14200 73712 365596
+
+
+
+
+-- Check if k-th queen is attacked by any other prior queen.
+-- Return nonzero if configuration is OK, zero otherwise.
+
+function configOkay (k:integer, a:{integer}):boolean
+	local z:integer = a[k]
+	local l:integer
+	local kmj:integer
+
+	for j=1, k-1 do
+		l = z - a[j]
+		kmj = k - j
+		if (l == 0  or  l == kmj  or  -l == kmj) then
+			return false
+		end
+	end
+	return true
+end
+
+
+
+function solve (N:integer, a:{integer}):integer	-- return number of positions
+	local cnt:integer = 0
+	local k:integer = 1
+	local N2:integer = N  --(N + 1) / 2;
+	local flag:integer
+	a[1] = 1
+
+	while true do
+		flag = 0
+		--print(string.format("\tN=%d, flag=%d, a[%d]=%d\n",N, flag, k, a[k]))
+		if (configOkay(k,a)) then
+			if (k < N) then
+				k = k + 1;  a[k] = 1; flag = 1
+			else
+				cnt = cnt + 1; flag = 0
+			end
+		end
+		if (flag == 0) then
+			flag = 0
+			repeat
+				if (a[k] < N) then
+					a[k] = a[k] + 1;  flag = 1; break;
+				end
+				k = k - 1
+			until (k <= 1)
+			if (flag == 0) then
+				a[1] = a[1] + 1
+				if (a[1] > N2) then return cnt; end
+				k = 2;  a[2] = 1;
+			end
+		end
+	end
+end
+
+
