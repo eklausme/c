@@ -10,6 +10,7 @@
    Elmar Klausmeier, 02-Feb-2021
    Elmar Klausmeier, 04-Feb-2021: Andreas Schneider comments
    Elmar Klausmeier, 09-Feb-2021: min/max, inverfl()
+   Elmar Klausmeier, 11-Feb-2021: Andreas Schneider on Poisson distribution
 */
 
 #include <stdio.h>
@@ -19,7 +20,7 @@
 #include <gsl/gsl_randist.h>
 
 #define MAX_DRAW	5000000
-#define MAX_DRAW_ARR	6000000
+//#define MAX_DRAW_ARR	6000000
 #define	R1	1.64485362695147
 #define R2	2.32634787404084
 
@@ -174,11 +175,11 @@ int dblcmp(const void *d1, const void*d2) {	// needed for qsort()
 }
 
 
-static double drw[MAX_DRAW_ARR];
+static double drw[MAX_DRAW];
 
 
 int main (int argc, char *argv[]) {
-	int c, i, nr, n=20, debug=0, quantileType=95, pois;
+	int c, i, j, n=20, debug=0, quantileType=95, pois;
 	double lambda=2, modal=0, quantile=0, mu=0, sigma=1, minlog=-1, maxlog=-1, x;
 	const gsl_rng_type *T;
 	gsl_rng *r;
@@ -268,7 +269,7 @@ int main (int argc, char *argv[]) {
 	mu = log(modal) + sigma * sigma;
 	if (mu <= 0) {
 		printf("mu non-positive, mu=%f\n",mu);
-		return 6;
+		return 7;
 	}
 	printf("lambda=%.8f, mu=%.8f, sigma=%.8f\n", lambda, mu, sigma);
 	printf("Check: median=%.8f, modal=%.8f, q95=%.8f, q99=%.8f\n",
@@ -281,49 +282,40 @@ int main (int argc, char *argv[]) {
 	T = gsl_rng_default;
 	r = gsl_rng_alloc(T);
 
-	for (nr=0; nr<n; nr+=pois) {
+	for (i=0; i<n; ++i) {
 		pois = gsl_ran_poisson(r,lambda);
-		if (pois == 0) {	// event did not happen, therefore zero drw[nr]
-			pois = 1;
-			drw[nr] = 0;
-			if (debug) printf("%d\t0\t\%f\n",nr+1,drw[nr]);
-		} else {
-			if (nr + pois >= MAX_DRAW_ARR) {
-				printf("Array bound out of range, nr=%d\n",nr);
-				return 7;
+		drw[i] = 0;	// event did not happen, therefore zero drw[i]
+		for (j=0; j<pois; ++j) {	// draw pois-many lognormal random numbers
+			for (;;) {
+				x = gsl_ran_lognormal(r,mu,sigma);
+				if (minlog >= 0.0  &&  x < minlog) continue;
+				if (maxlog >= 0.0  &&  x > maxlog) continue;
+				break;
 			}
-			for (i=0; i<pois; ++i) {
-				for (;;) {
-					x = gsl_ran_lognormal(r,mu,sigma);
-					if (minlog >= 0.0  &&  x < minlog) continue;
-					if (maxlog >= 0.0  &&  x > maxlog) continue;
-					break;
-				}
-				drw[nr+i] = x;
-				if (debug) printf("%d\t%d\t\%f\n",nr+i+1,pois,drw[nr+i]);
-			}
+			drw[i] += x;
 		}
+		if (debug) printf("%d\t%d\t\%f\n",i+1,pois,drw[i]);
 	}
 
 	gsl_rng_free(r);
 
-	qsort(drw,nr,sizeof(drw[0]),dblcmp);
+	qsort(drw,n,sizeof(drw[0]),dblcmp);
 	if (debug) puts("Sorted:");
 	double sum=0;
-	for (i=0; i<nr; ++i) {
+	for (i=0; i<n; ++i) {
 		sum += drw[i];
 		if (debug) printf("%d\t%f\n",i+1,drw[i]);
 	}
-	int nq05 = (int)(0.05 * nr);
-	int nq25 = (int)(0.25 * nr);
-	int nq50 = (int)(0.50 * nr);
-	int nq95 = (int)(0.95 * nr);
-	int nq99 = (int)(0.99 * nr);
-	int nq99d9 = (int)(0.999 * nr);
-	printf("nr=%u, mean=%.8f, q05=%.8f, q25=%.8f, q50=%.8f, q95=%.8f, q99=%.8f, q99d9=%.8f, min=%.8f, max=%.8f\n",
-		nr, sum/nr,
+	int nq05 = (int)(0.05 * n);
+	int nq25 = (int)(0.25 * n);
+	int nq50 = (int)(0.50 * n);
+	int nq95 = (int)(0.95 * n);
+	int nq99 = (int)(0.99 * n);
+	int nq99d9 = (int)(0.999 * n);
+	printf("n=%u, mean=%.8f, q05=%.8f, q25=%.8f, q50=%.8f, q95=%.8f, q99=%.8f, q99d9=%.8f, min=%.8f, max=%.8f\n",
+		n, sum/n,
 		drw[nq05], drw[nq25], drw[nq50], drw[nq95], drw[nq99], drw[nq99d9],
-		drw[0], drw[nr-1]);
+		drw[0], drw[n-1]);
 
 	return 0;
 }
