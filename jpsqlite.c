@@ -297,12 +297,13 @@ static int copy_sqlite(void) {
 	int nrecsT=0, nrecsTC=0, nrecsM=0, nrecsMC=0, nrecsE=0, nrecsEC=0;
 	int i, r, total_records;
 	sqlite3_stmt *dbpstmt = NULL;
-	int sqlRet = 0;
+	int sqlRet = 0, errId;
 	char *sqlErr = "";
 
 
 	if (db == NULL  &&  (db = openSQLite()) == NULL)
 		return EXIT_FAILURE;
+	errId = -1;
 	CHK(sqlite3_exec(db,"BEGIN TRANSACTION",NULL,NULL,NULL),"BEGIN")
 	CHK(sqlite3_exec(db,
 		"delete from Addr; "
@@ -326,6 +327,7 @@ static int copy_sqlite(void) {
 		return EXIT_FAILURE;
 	}
 	jp_logf(JP_LOG_DEBUG,"\taddress labels\n");
+	errId = -1;
 	CHK(sqlite3_prepare_v2(db,
 		"insert into AddrLabel (Id, Label) "
 		"values (:Id, :Label)", -1, &dbpstmt, NULL), "ALPRE")
@@ -333,6 +335,7 @@ static int copy_sqlite(void) {
 		if (ai.labels[i][0] == '\0') continue;
 		jp_logf(JP_LOG_DEBUG,"\t\t%2d %s\n",i,ai.labels[i]);
 		++nrecsAL;
+		errId = i;
 		CHK(sqlite3_bind_int(dbpstmt,1,i),"ALB1")
 		CHK(sqlite3_bind_text(dbpstmt,2,ai.labels[i],-1,SQLITE_STATIC),"ALB2")
 		CHKDONE(sqlite3_step(dbpstmt),"ALST")
@@ -341,6 +344,7 @@ static int copy_sqlite(void) {
 	}
 	CHK(sqlite3_finalize(dbpstmt),"ALFIN")
 
+	errId = -1;
 	CHK(sqlite3_prepare_v2(db,
 		"insert into AddrCategory (Id, Label) "
 		"values (:Id, :Label)", -1, &dbpstmt, NULL), "ACPRE")
@@ -349,6 +353,7 @@ static int copy_sqlite(void) {
 		if (ai.category.name[i][0] == '\0') continue;
 		jp_logf(JP_LOG_DEBUG,"\t\t%2d %s\n",i,ai.category.name[i]);
 		++nrecsAC;
+		errId = i;
 		CHK(sqlite3_bind_int(dbpstmt,1,i),"ACB1")
 		CHK(sqlite3_bind_text(dbpstmt,2,ai.category.name[i],-1,SQLITE_STATIC),"ACB2")
 		CHKDONE(sqlite3_step(dbpstmt),"ACST")
@@ -357,6 +362,7 @@ static int copy_sqlite(void) {
 	}
 	CHK(sqlite3_finalize(dbpstmt),"ACFIN")
 
+	errId = -1;
 	CHK(sqlite3_prepare_v2(db,
 		"insert into PhoneLabel (Id, Label) "
 		"values (:Id, :Label)", -1, &dbpstmt, NULL), "PLPRE")
@@ -364,6 +370,7 @@ static int copy_sqlite(void) {
 		if (ai.phoneLabels[i][0] == '\0') continue;
 		jp_logf(JP_LOG_DEBUG,"\t\t%2d %s\n",i,ai.phoneLabels[i]);
 		++nrecsPL;
+		errId = i;
 		CHK(sqlite3_bind_int(dbpstmt,1,i),"PLB1")
 		CHK(sqlite3_bind_text(dbpstmt,2,ai.phoneLabels[i],-1,SQLITE_STATIC),"PLB2")
 		CHKDONE(sqlite3_step(dbpstmt),"PLST")
@@ -374,6 +381,7 @@ static int copy_sqlite(void) {
 
 	r = get_addresses(&a, SORT_ASCENDING);
 	jp_logf(JP_LOG_DEBUG,"get_addresses() returned %d records\n", r);
+	errId = -1;
 	CHK(sqlite3_prepare_v2(db,
 		"insert into Addr ("
 		"    Id, Category, Private, showPhone, "	// 1
@@ -403,7 +411,7 @@ static int copy_sqlite(void) {
 				a->maddr.rt,
 				a->maddr.addr.entry[entryLastname]);
 		}
-		if (nrecsA < 10)
+		//if (nrecsA < 10)
 			jp_logf(JP_LOG_DEBUG,"\t%d, %9u, rt=%d, %s: %s, %s\n",
 				a->app_type,
 				a->maddr.unique_id,
@@ -416,6 +424,7 @@ static int copy_sqlite(void) {
 		&&  a->maddr.rt != REPLACEMENT_PALM_REC)
 			continue;
 		++nrecsA;
+		errId = a->maddr.unique_id;
 		CHK(sqlite3_bind_int(dbpstmt,1,a->maddr.unique_id),"AB1")
 		CHK(sqlite3_bind_int(dbpstmt,2,a->maddr.attrib & 0x0F),"AB2")
 		CHK(sqlite3_bind_int(dbpstmt,3,IS_PRIVATE(a->maddr.attrib)),"AB3")
@@ -447,7 +456,7 @@ static int copy_sqlite(void) {
 		CHKDONE(sqlite3_step(dbpstmt),"AST")
 		CHK(sqlite3_clear_bindings(dbpstmt),"ACL")
 		CHK(sqlite3_reset(dbpstmt),"ARST")
-		if (nrecsA > 10000) break;
+		if (nrecsA > 29500) break;	// runaway?
 	}
 	CHK(sqlite3_finalize(dbpstmt),"AFIN")
 	jp_logf(JP_LOG_DEBUG,"%d address records in list\n", nrecsA);
@@ -456,6 +465,7 @@ static int copy_sqlite(void) {
 	// Datebook
 	r = get_days_calendar_events(&c, NULL, CATEGORY_ALL, &total_records);
 	jp_logf(JP_LOG_DEBUG,"get_days_calendar_events() returned %d\n", r);
+	errId = -1;
 	CHK(sqlite3_prepare_v2(db,
 		"insert into Datebook ("
 		"    Id, Private, Timeless, Begin, End, "	// 1
@@ -487,6 +497,7 @@ static int copy_sqlite(void) {
 		&&  c->mcale.rt != REPLACEMENT_PALM_REC)
 			continue;
 		++nrecsD;
+		errId = c->mcale.unique_id;
 		strftime(begin,32,"%FT%R",&c->mcale.cale.begin);
 		strftime(end,32,"%FT%R",&c->mcale.cale.end);
 		// Data cleansing
@@ -538,6 +549,7 @@ static int copy_sqlite(void) {
 		if (mi.category.name[i][0] == '\0') continue;
 		jp_logf(JP_LOG_DEBUG,"\t\t%2d %s\n",i,mi.category.name[i]);
 		++nrecsMC;
+		errId = i;
 		CHK(sqlite3_bind_int(dbpstmt,1,i),"MCB1")
 		CHK(sqlite3_bind_text(dbpstmt,2,mi.category.name[i],-1,SQLITE_STATIC),"MCB2")
 		CHKDONE(sqlite3_step(dbpstmt),"MCST")
@@ -546,6 +558,7 @@ static int copy_sqlite(void) {
 	}
 	CHK(sqlite3_finalize(dbpstmt),"MCFIN")
 
+	errId = -1;
 	CHK(sqlite3_prepare_v2(db,
 		"insert into Memo ("
 		"    Id, Category, Private, Text "
@@ -567,6 +580,7 @@ static int copy_sqlite(void) {
 		&&  m->mmemo.rt != REPLACEMENT_PALM_REC)
 			continue;
 		++nrecsM;
+		errId = m->mmemo.unique_id;
 		CHK(sqlite3_bind_int(dbpstmt,1,m->mmemo.unique_id),"MB1")
 		CHK(sqlite3_bind_int(dbpstmt,2,m->mmemo.attrib & 0x0F),"MB2")
 		CHK(sqlite3_bind_int(dbpstmt,3,IS_PRIVATE(m->mmemo.attrib)),"MB3")
@@ -574,7 +588,7 @@ static int copy_sqlite(void) {
 		CHKDONE(sqlite3_step(dbpstmt),"MST")
 		CHK(sqlite3_clear_bindings(dbpstmt),"MCL")
 		CHK(sqlite3_reset(dbpstmt),"MRST")
-		if (nrecsM > 500) break;
+		if (nrecsM > 29500) break;	// runaway?
 	}
 	CHK(sqlite3_finalize(dbpstmt),"MFIN")
 	jp_logf(JP_LOG_DEBUG,"%d memo records in list\n", nrecsM);
@@ -585,6 +599,7 @@ static int copy_sqlite(void) {
 		jp_logf(JP_LOG_DEBUG,"get_todo_app_info() returned %d\n",r);
 		return EXIT_FAILURE;
 	}
+	errId = -1;
 	CHK(sqlite3_prepare_v2(db,
 		"insert into ToDoCategory (Id, Label) "
 		"values (:Id, :Label)", -1, &dbpstmt, NULL),"TCPRE")
@@ -592,6 +607,7 @@ static int copy_sqlite(void) {
 		if (tdi.category.name[i][0] == '\0') continue;
 		jp_logf(JP_LOG_DEBUG,"\t\t%2d %s\n",i,tdi.category.name[i]);
 		++nrecsTC;
+		errId = i;
 		CHK(sqlite3_bind_int(dbpstmt,1,i),"TCB1")
 		CHK(sqlite3_bind_text(dbpstmt,2,tdi.category.name[i],-1,SQLITE_STATIC),"TCB2")
 		CHKDONE(sqlite3_step(dbpstmt),"TCST")
@@ -600,6 +616,7 @@ static int copy_sqlite(void) {
 	}
 	CHK(sqlite3_finalize(dbpstmt),"TCFIN")
 
+	errId = -1;
 	CHK(sqlite3_prepare_v2(db,
 		"insert into ToDo ("
 		"    Id, Category, Private, Indefinite, "	// 1
@@ -625,6 +642,7 @@ static int copy_sqlite(void) {
 		&&  td->mtodo.rt != REPLACEMENT_PALM_REC)
 			continue;
 		++nrecsT;
+		errId = td->mtodo.unique_id;
 		strftime(due,32,"%F",&td->mtodo.todo.due);
 		CHK(sqlite3_bind_int(dbpstmt,1,td->mtodo.unique_id),"TB1")
 		CHK(sqlite3_bind_int(dbpstmt,2,td->mtodo.attrib & 0x0F),"TB2")
@@ -638,7 +656,7 @@ static int copy_sqlite(void) {
 		CHKDONE(sqlite3_step(dbpstmt),"TST")
 		CHK(sqlite3_clear_bindings(dbpstmt),"TCL")
 		CHK(sqlite3_reset(dbpstmt),"TRST")
-		if (nrecsT > 500) break;
+		if (nrecsT > 29500) break;	// runaway?
 	}
 	CHK(sqlite3_finalize(dbpstmt),"TFIN")
 	jp_logf(JP_LOG_DEBUG,"%d to-do records in list\n", nrecsT);
@@ -649,6 +667,7 @@ static int copy_sqlite(void) {
 	jp_get_app_info("ExpenseDB", &buf, &buf_size);
 	unpack_ExpenseAppInfo(&ei, buf, buf_size);
 	if (buf) free(buf);
+	errId = -1;
 	CHK(sqlite3_prepare_v2(db,
 		"insert into ExpenseCategory (Id, Label) "
 		"values (:Id, :Label)", -1, &dbpstmt, NULL), "ECPRE")
@@ -657,6 +676,7 @@ static int copy_sqlite(void) {
 		if (ei.category.name[i][0] == '\0') continue;
 		jp_logf(JP_LOG_DEBUG,"\t\t%2d %s\n",i,ei.category.name[i]);
 		++nrecsEC;
+		errId = i;
 		CHK(sqlite3_bind_int(dbpstmt,1,i),"ECB1")
 		CHK(sqlite3_bind_text(dbpstmt,2,ei.category.name[i],-1,SQLITE_STATIC),"ACB2")
 		CHKDONE(sqlite3_step(dbpstmt),"ECST")
@@ -668,6 +688,7 @@ static int copy_sqlite(void) {
 	// Below modeled after display_records() in Expense/expense.c
 	r = jp_read_DB_files("ExpenseDB", &explst);
 	jp_logf(JP_LOG_DEBUG,"jp_read_DB_file() for ExpenseDB returned %d\n", r);
+	errId = -1;
 	CHK(sqlite3_prepare_v2(db,
 		"insert into Expense ("
 		"    Id, Category, Date, Type, Payment, "	// 1
@@ -693,6 +714,7 @@ static int copy_sqlite(void) {
 				ei.category.name[br->attrib & 0x0F],
 				e.vendor);
 		++nrecsE;
+		errId = br->unique_id;
 		strftime(date,32,"%F",&(e.date));
 		CHK(sqlite3_bind_int(dbpstmt,1,br->unique_id),"EB1")
 		CHK(sqlite3_bind_int(dbpstmt,2,br->attrib & 0x0F),"EB2")
@@ -708,7 +730,7 @@ static int copy_sqlite(void) {
 		CHKDONE(sqlite3_step(dbpstmt),"EST")
 		CHK(sqlite3_clear_bindings(dbpstmt),"ECL")
 		CHK(sqlite3_reset(dbpstmt),"ERST")
-		if (nrecsE > 500) break;
+		if (nrecsE > 29500) break;	// runaway?
 	}
 	CHK(sqlite3_finalize(dbpstmt),"EFIN")
 	jp_logf(JP_LOG_DEBUG,"%d expense records in list\n", nrecsE);
@@ -735,8 +757,8 @@ static int copy_sqlite(void) {
 	return EXIT_SUCCESS;
 
 err:
-	jp_logf(JP_LOG_FATAL,"SQLite3 ret=%d, error=%s, rolling back\n%s\n",
-		sqlRet, sqlErr, sqlite3_errmsg(db));
+	jp_logf(JP_LOG_FATAL,"SQLite3 ret=%d, error=%s, Id=%d, rolling back\n%s\n",
+		sqlRet, sqlErr, errId, sqlite3_errmsg(db));
 	sqlite3_finalize(dbpstmt);
 	sqlite3_exec(db,"ROLLBACK TRANSACTION",NULL,NULL,NULL);
 	return EXIT_FAILURE;
