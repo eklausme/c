@@ -2,12 +2,15 @@
    Write from pdb+pc3 records to single SQLite3 database.
    Works for: Address, Datebook, Memo, ToDo, Expense
    Elmar Klausmeier, 16-Apr-2020
+   Elmar Klausmeier, 28-Sep-2021: Changed to GTK3
 
    License: GPL v2 (GNU General Public License)
    https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
    Build with:
-   gcc `pkg-config -cflags-only-I gtk+-2.0` -I <J-Pilot src dir> -s -fPIC -shared jpsqlite.c -o libjpsqlite.so -lsqlite3
+   gcc `pkg-config -cflags-only-I gtk+-3.0` -I <J-Pilot src dir> -s -fPIC -shared jpsqlite.c -o libjpsqlite.so
+
+   Lib "-lsqlite3" no longer required, as part of GTK3/Tracker.
 */
 
 #include <stdio.h>
@@ -68,8 +71,8 @@ int plugin_help(char **text, int *width, int *height) {
 	*text = strdup(
 		"\n"
 		"SQLite3\n\n"
-		"Elmar Klausmeier, 17-Apr-2020\n"
-		"https://eklausmeier.wordpress.com\n"
+		"Elmar Klausmeier, 28-Sep-2021\n"
+		"https://eklausmeier.goip.de\n"
 		"\n");
 	*height = 0;
 	*width = 0;
@@ -777,9 +780,9 @@ int plugin_gui(GtkWidget *vbox, GtkWidget *hbox, unsigned int unique_id) {
 	copy_sqlite_button = gtk_button_new_with_label("SQL");
 	gtk_box_pack_start(GTK_BOX(vbox),copy_sqlite_button,TRUE,TRUE,0);
 	if (connected == 0) {
-		gtk_signal_connect(GTK_OBJECT(copy_sqlite_button),
+		g_signal_connect(G_OBJECT(copy_sqlite_button),
 			"clicked",
-			GTK_SIGNAL_FUNC(cb_copy_sqlite), NULL);
+			G_CALLBACK(cb_copy_sqlite), NULL);
 		connected = 1;
 	}
 	gtk_widget_show_all(vbox);
@@ -791,9 +794,9 @@ int plugin_gui(GtkWidget *vbox, GtkWidget *hbox, unsigned int unique_id) {
 
 int plugin_gui_cleanup(void) {
 	if (connected == 1) {
-		gtk_signal_disconnect_by_func(
-			GTK_OBJECT(copy_sqlite_button),
-			GTK_SIGNAL_FUNC(cb_copy_sqlite), NULL);
+		g_signal_handlers_disconnect_by_func(
+			G_OBJECT(copy_sqlite_button),
+			G_CALLBACK(cb_copy_sqlite), NULL);
 		connected = 0;
 	}
 	return EXIT_SUCCESS;
