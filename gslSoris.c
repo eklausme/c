@@ -294,7 +294,7 @@ int main (int argc, char *argv[]) {
 			}
 			drw[i] += x;
 		}
-		if (debug) printf("%d\t%d\t\%f\n",i+1,pois,drw[i]);
+		if (debug) printf("%d\t%d\t%f\n",i+1,pois,drw[i]);
 	}
 
 	gsl_rng_free(r);
