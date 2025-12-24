@@ -1721,7 +1721,7 @@ int main (int argc, char *argv[]) {
 		case 'h':
 			printf("%s: compute stability regions for various formulas.\n"
 			"-b: base formula, Base3-9\n"
-			"-f: formulas: BDF1-6, DonelsonHansen1-6, Mihelcic4-7, Tischer2-8, Tendler3-7\n"
+			"-f: formulas: BDF1-6, DonelsonHansen1-6, Mihelcic4-7, Tischer2-8, Tendler3-7, eTendler3-9, Picel1-10, Rubin1-6\n"
 			"-d: debug\n"
 			"-h: this help\n"
 			"-I <cycle-length>:<min>:<max>:<max iterations> random search in linear combinations\n"
