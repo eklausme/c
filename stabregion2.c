@@ -7,6 +7,7 @@ Reduced command line flags, 02-Dec-2025
 Linear combination logic, 04-Dec-2025
 Random combinations, 10-Dec-2025
 Testing formulas on y´= lambda y, 14-Dec-2025
+Scaled error constant, 06-Jan-2026
 */
 
 #include <stdio.h>
@@ -389,7 +390,7 @@ formula_t F[] = {
 		-0.4802414664147507604935996997277e+01,  0.2592699276978907532702377400625e+01, -0.2778518172270275904802809146576e+01,  0.2649630382099203346956766040160e+01,  0.3219958911202349451261006329238e-02,
 		 1,                                     -0.2630752125658557609101843879749e+01,  0.4366928200996645755541775423194e+01, -0.6226227266320010195981550682429e+01,  0.1553984660531454990906076870577e-01,
 		 0,                                      1,                                     -0.3345093122003647795108409243309e+01,  0.7304031887973224464306216642665e+01, -0.4533196816782826816679836557976e+00,
-		 0,                                      0,                                      1,                                     -0.4277052518196382694923907613400e+01,  0.1691723344964800813261126750020e+01,
+		 0,                                      0,                                      1,                                     -0.4277052518195382694923907613400e+01,  0.1691723344964800813261126750020e+01,
 		 0,                                      0,                                      0,                                      1,                                     -0.2257163468803035030953464869257e+01,
 		 0,                                      0,                                      0,                                      0,                                      1,
 		// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -398,8 +399,8 @@ formula_t F[] = {
 		 0.1146229672531143866569110401229e+01, -0.3550507135730755767219599244966e+00,  0.1003502539567659420767582244072e+00,                                      0,                                      0,
 		 0.6542124190961045586099091344395e+00,  0.9776848659097670987554894143623e+00, -0.6085349671365743688808169611528e+00,  0.2643442532041219470801194385611e+00,                                      0,
 		-0.1322701573944066648938040619221e+01, -0.1124773012768567816507929091140e+01,  0.1286689084300843479379774302352e+01, -0.1081991130901289033649461985260e+01,  0.3096249379217892308281396122901e-01,
-		 0.4840799656531792806536461685364e+00,  0.1917873380953330674263870885019e+00, -0.9223533615854392440249726038524e+00,  0.1354222521191408219378646232897e+01, -0.2269170368480450921510442892867e+00,
-		 0,                                      0.3700608846337565198520459335580e+00, -0.2298469653682757407333327433246e+00, -0.9237493311630675669214627664954e-01,  0.7904598622265127771615281344478e+00,
+		 0.4840799656531792806536461685364e+00,  0.1917873380953330674263870885019e+00, -0.9223533515854392440249726038524e+00,  0.1354222521191408219378646232897e+01, -0.2269170368480450921510442892867e+00,
+		 0,                                      0.3700608846337565198520459335580e+00, -0.2298469653682757407333327433246e+00, -0.9237493311630675659214627664954e-01,  0.7904598622265127771615281344478e+00,
 		 0,                                      0,                                      0.3969920978990539400467297585933e+00, -0.8904512454964667161729702886816e+00, -0.1202094468615905428211278510487e+01,
 		 0,                                      0,                                      0,                                      0.4473119757158579081724970288316e+00,  0.4061703817752004671762456256483e+00,
 		 0,                                      0,                                      0,                                      0,                                      0.3568354106010698554863523086895e+00 }
@@ -1138,8 +1139,10 @@ void js3d(int i, complex lambda, double xmin, double widlw) {
 }
 
 void printFormulas (formula_t F[], int nf) {
-	int i, j, k, l, n, nu, iq, iqm1, q, flag;
-	double rho1;
+	int i, j, k, l, n, nu, i1, i2, i3, n2, iqm1, q, qfac, flag;
+	double rho1, alphaii, t;
+	long double rho1sum, rho1c, t1, t2, rho1arr[2*N];
+	const char *marker[3] = { "", "\t<-----", "\t<+++++" };
 
 	// Print out all formulas
 	for (i=0; i<nf; ++i) {
@@ -1149,7 +1152,7 @@ void printFormulas (formula_t F[], int nf) {
 		for (k=0; k<n; ++k) {
 			printf("\t");
 			for (j=0; j<l; ++j)
-				printf("%13.4f",F[i].a[k*l+j]);
+				printf("%15.4f",F[i].a[k*l+j]);
 			puts("");
 		}
 		printf("rho_0\t");	// rho(1)=0, that's what it should be
@@ -1160,26 +1163,53 @@ void printFormulas (formula_t F[], int nf) {
 			for (k=0; k<n; ++k)
 				rho1 += F[i].a[k*l+j];
 			if (rho1 != 0) flag = 1;
-			printf("%22.9f",rho1);
+			printf("%22.9f",(double)rho1);
 		}
 		puts(flag ? "\t<-----" : "");
 		// Compute consistency check up to the order of the formula
+		qfac = 1;	// factorial
 		for (q=1; q<=F[i].p+1; ++q) {
+			qfac *= q;
 			printf("rho_%d\t",q);	// rho_q = \sum \alpha_i i^q - q \sum \beta_i i^{q-1}, should be zero
 			flag = 0;
-			n = F[i].k + F[i].l;
+			n = F[i].k + F[i].l; n2 = 2 * n;
 			for (j=0; j<l; ++j) {
-				rho1 = 0.0;
+				rho1 = 0.0; rho1sum = 0.0;
+				if ((alphaii = F[i].a[(F[i].k+j)*l+j]) == 0) { flag = 2; alphaii = 1; }
 				for (k=0; k<n; ++k) {
-					iq = 1, iqm1 = 1;
+					iqm1 = 1; // iq = 1;
 					for (nu=1; nu<q; ++nu) iqm1 *= k;
-					iq = iqm1 * k;
-					rho1 += F[i].a[k*l+j] * iq - q * F[i].a[(n+k)*l+j] * iqm1;
+					//iq = iqm1 * k;
+					//rho1 += (long double)F[i].a[k*l+j] * iq - q * (long double)F[i].a[(n+k)*l+j] * iqm1;
+					//rho1 += ((long double)F[i].a[k*l+j] * k - (long double)F[i].a[(n+k)*l+j] * q) * iqm1;
+					//rho1 += ((long double)F[i].a[k*l+j] / alphaii * k - (long double)F[i].a[(n+k)*l+j] / alphaii * q) * iqm1;
+					rho1arr[2*k] = (long double)F[i].a[k*l+j] * (long double)k * (long double)iqm1;
+					rho1arr[2*k+1] = -(long double)F[i].a[(n+k)*l+j] * (long double)q * (long double)iqm1;
 				}
-				if (rho1 != 0) flag = 1;
-				printf("%22.9f",rho1);
+				for (i1=n2/2; i1>0; i1/=2)	// Shell sort, K&R, §3.5, p.55
+					for (i2=i1; i2<n2; ++i2)
+						for (i3=i2-i1; i3>=0 && fabsl(rho1arr[i3])>fabsl(rho1arr[i3+i1]); i3-=i1) {
+							t = rho1arr[i3];
+							rho1arr[i3] = rho1arr[i3+i1];
+							rho1arr[i3+i1] = t;
+						}
+				//printf(">> ");
+				//for (i1=0; i1<n2; ++i1) printf(" %g",rho1arr[i1]);
+				//printf("\n");
+				rho1c = 0.0;	// Kahan's summation, rho1c is compensation
+				for (i1=0; i1<n2; ++i1) {
+					t1 = rho1arr[i1] - rho1c;
+					t2 = rho1sum + t1;
+					rho1c = (t2 - rho1sum) - t1;
+					rho1sum = t2;
+				}
+				rho1 = rho1sum;
+				if (flag == 0 && rho1 != 0) flag = 1;
+				//printf("<%22.9f,%d,%g>",rho1, qfac, alphaii);
+				printf(" %22.9f",rho1 / qfac / alphaii);
 			}
-			puts(flag ? "\t<-----" : "");
+			//puts(flag ? "\t<-----" : "");
+			puts(marker[flag]);
 		}
 	}
 }
@@ -1204,7 +1234,7 @@ void fillMatrices (formula_t *fm, double a0[], double a1[], double b0[], double 
 	}
 	if (n >= N) {
 		printf("error in fillMatrices(): n=%d equals or exceeds N=%d\n",n,N);
-		exit(5);
+		exit(14);
 	}
 	nrest = fm->l;
 	nsq = n * n;
@@ -1605,7 +1635,7 @@ void solveTestEqSingle (formula_t *fm, float radius, float phi, float start, flo
 	n = fm->k + fm->l;
 	if (n >= N) {
 		printf("error in solveTestEqSingle(): n=%d equals or exceeds N=%d\n",n,N);
-		exit(6);
+		exit(15);
 	}
 	printf("%-9s  %16s  %16s  %16s  %16s  %16s  %16s\n",
 		"step","t", "Re(y)", "Im(y)", "|err|", "|global err|", "gerr/step");
@@ -1652,7 +1682,7 @@ void solveTestEq (formula_t *fm, double radius, double phi, double start, double
 	n = fm->k + fm->l;
 	if (n >= N) {
 		printf("error in solveTestEq(): n=%d equals or exceeds N=%d\n",n,N);
-		exit(6);
+		exit(16);
 	}
 	printf("%-9s  %16s  %16s  %16s  %16s  %16s  %16s\n",
 		"step","t", "Re(y)", "Im(y)", "|err|", "|global err|", "gerr/step");
@@ -1682,8 +1712,102 @@ void solveTestEq (formula_t *fm, double radius, double phi, double start, double
 
 
 
+void solveRunge (formula_t *fm, double start, double stop, double step) {
+	int i, j, imk, m, mcnt, n;
+	double t, tdenom, hft, err, gerr=0, y[N], z[N], yexact;
+
+	t = start;
+	printf("formula=%s, start=%g, stop=%g, step=%g, eps=%g\n",fm->name,start,stop,step,eps);
+	stop *= 1 + 2 * eps;
+	for (i=0; i<fm->k; ++i) {	// k start values
+		y[i] = 1 / (1 + t * t),	// exact values as starting values
+		tdenom = 1 + t * t;
+		z[i] = -2 * step * t / (tdenom * tdenom) ;	// z = h f(t,y)
+		printf("%9d  %16.8f  %16.8f\n",i+1,t,y[i]);
+		t += step;
+	}
+
+	mcnt = fm->k;
+	n = fm->k + fm->l;
+	if (n >= N) {
+		printf("error in solveRunge(): n=%d equals or exceeds N=%d\n",n,N);
+		exit(17);
+	}
+	printf("%-9s  %16s  %16s  %16s  %16s  %16s\n",
+		"step","t", "y", "|err|", "|global err|", "gerr/step");
+	while ((step > 0 && t <= stop) || (step < 0 && t >= stop)) {
+		for (i=fm->k; i<n; ++i) {
+			m = mcnt % n, y[m] = 0, z[m] = 0, imk = i - fm->k;
+			for (j=0; j<i; ++j) {	// index gymnastics
+				y[m] += fm->a[imk+j*fm->l] * y[(mcnt-i+j)%n],
+				z[m] += fm->a[imk+(j+n)*fm->l] * z[(mcnt-i+j)%n];
+			}
+			tdenom = 1 + t * t;
+			hft = -2 * step * t / (tdenom * tdenom);
+			y[m] = (fm->a[imk+(i+n)*fm->l] * hft - y[m] + z[m]) / fm->a[imk+i*fm->l];
+			z[m] = hft;
+			yexact = 1 / (1 + t * t);
+			err = fabs(y[m] - yexact),
+			gerr += err;
+			++mcnt;
+			printf("%9d  %16.8f  %16.8g  %16.8g  %16.8g  %16.8g\n",
+				mcnt,t, y[m], err,gerr,gerr/mcnt);
+			t += step;
+		}
+	}
+}
+
+
+
+void solveRungeQuad (formula_t *fm, double start, double stop, double step) {
+	int i, j, imk, m, mcnt, n;
+	long double t, tdenom, hft, err, gerr=0, y[N], z[N], yexact;
+
+	t = start;
+	printf("formula=%s, start=%g, stop=%g, step=%g, eps=%g\n",fm->name,start,stop,step,eps);
+	stop *= 1 + 2 * eps;
+	for (i=0; i<fm->k; ++i) {	// k start values
+		y[i] = 1 / (1 + t * t),	// exact values as starting values
+		tdenom = 1 + t * t;
+		z[i] = -2 * step * t / (tdenom * tdenom) ;	// z = h f(t,y)
+		printf("%9d  %16.8f  %16.8f\n",i+1,(double)t,(double)y[i]);
+		t += step;
+	}
+
+	mcnt = fm->k;
+	n = fm->k + fm->l;
+	if (n >= N) {
+		printf("error in solveRunge(): n=%d equals or exceeds N=%d\n",n,N);
+		exit(17);
+	}
+	printf("%-9s  %16s  %16s  %16s  %16s  %16s\n",
+		"step","t", "y", "|err|", "|global err|", "gerr/step");
+	while ((step > 0 && t <= stop) || (step < 0 && t >= stop)) {
+		for (i=fm->k; i<n; ++i) {
+			m = mcnt % n, y[m] = 0, z[m] = 0, imk = i - fm->k;
+			for (j=0; j<i; ++j) {	// index gymnastics
+				y[m] += fm->a[imk+j*fm->l] * y[(mcnt-i+j)%n],
+				z[m] += fm->a[imk+(j+n)*fm->l] * z[(mcnt-i+j)%n];
+			}
+			tdenom = 1 + t * t;
+			hft = -2 * step * t / (tdenom * tdenom);
+			y[m] = (fm->a[imk+(i+n)*fm->l] * hft - y[m] + z[m]) / fm->a[imk+i*fm->l];
+			z[m] = hft;
+			yexact = 1 / (1 + t * t);
+			err = fabs(y[m] - yexact),
+			gerr += err;
+			++mcnt;
+			printf("%9d  %16.8f  %16.8g  %16.8g  %16.8g  %16.8g\n",
+				mcnt,(double)t, (double)y[m], (double)err,(double)gerr,(double)gerr/mcnt);
+			t += step;
+		}
+	}
+}
+
+
+
 int main (int argc, char *argv[]) {
-	int c, i, n, nr=20, nsq, outp='p', print=1, task=0, cycleLen=3, niter=100;
+	int c, i, n, nr=20, nsq, outp='p', print=1, task=0, cycleLen=3, niter=100, prec=0;
 	char *fname = NULL;
 	char cmach[8];
 	formula_t *fm = NULL, *bm = NULL;
@@ -1691,7 +1815,7 @@ int main (int argc, char *argv[]) {
 	double xmin, xmax, ymax, widlw=0, a0[N*N], a1[N*N], b0[N*N], b1[N*N], start=-50, stop=50, step=5, radius, phi;
 	prtf_t prtf = plainOutput;
 
-	while ((c = getopt(argc,argv,"b:f:dhi:I:l:o:r:t:T:W:")) != -1) {
+	while ((c = getopt(argc,argv,"b:f:dhi:I:l:o:r:t:u:W:")) != -1) {
 		switch(c) {
 		case 'b':	// step numbers of base formulas
 			for (i=0; i<NB; ++i)	// linear search for formula
@@ -1721,7 +1845,7 @@ int main (int argc, char *argv[]) {
 		case 'h':
 			printf("%s: compute stability regions for various formulas.\n"
 			"-b: base formula, Base3-9\n"
-			"-f: formulas: BDF1-6, DonelsonHansen1-6, Mihelcic4-7, Tischer2-8, Tendler3-7, eTendler3-9, Picel1-10, Rubin1-6\n"
+			"-f: formulas: BDF1-6, DonelsonHansen1-6, Mihelcic4-7, Tischer2-8, Tendler3-7, eTendler3-9, Picel2-10, Rubin1-6\n"
 			"-d: debug\n"
 			"-h: this help\n"
 			"-I <cycle-length>:<min>:<max>:<max iterations> random search in linear combinations\n"
@@ -1729,8 +1853,8 @@ int main (int argc, char *argv[]) {
 			"-l: file name with linear combinations for the base formula\n"
 			"-o: output format in either 'p' (plain) or 'j' (Javascript) or '3' (3-dimensional)\n"
 			"-r: number of records\n"
-			"-T <radius>:<phi>:t0:t1:h single precision testing formula for y'=lambda y,\n\tfrom t0 to t1 using stepsize h (lambda = r e^(i phi)\n"
-			"-t <radius>:<phi>:t0:t1:h testing formula for y'=lambda y,\n\tfrom t0 to t1 using stepsize h (lambda = r e^(i phi)\n"
+			"-t <prec>:<radius>:<phi>:t0:t1:h testing formula for y'=lambda y,\n\tfrom t0 to t1 using stepsize h (lambda = r e^(i phi)\n"
+			"-u <prec>:t0:t1:h testing formula for y'=-2t/(1+t^2)^2,\n\tfrom t0 to t1 using stepsize h\n"
 			"-W: minimal Widlund wedge\n", argv[0]);
 			return 0;
 		case 'I':	// random search
@@ -1768,20 +1892,24 @@ int main (int argc, char *argv[]) {
 				printf("%s: nr<0, silently set to %d\n",argv[0],nr);
 			}
 			break;
-		case 'T':	// test method on y' = lambda y
-			task = 3;
-			sscanf(optarg,"%lf:%lf:%lf:%lf:%lf",&radius,&phi,&start,&stop,&step);
-			break;
+		//case 'T':	// test method on y' = lambda y
+		//	task = 3;
+		//	sscanf(optarg,"%lf:%lf:%lf:%lf:%lf",&radius,&phi,&start,&stop,&step);
+		//	break;
 		case 't':	// test method on y' = lambda y
+			task = 3;
+			sscanf(optarg,"%d:%lf:%lf:%lf:%lf:%lf",&prec,&radius,&phi,&start,&stop,&step);
+			break;
+		case 'u':	// test method on Runge's function leading to 1/(1+t^2)
 			task = 4;
-			sscanf(optarg,"%lf:%lf:%lf:%lf:%lf",&radius,&phi,&start,&stop,&step);
+			sscanf(optarg,"%d:%lf:%lf:%lf",&prec,&start,&stop,&step);
 			break;
 		case 'W':
 			widlw = fabs(atof(optarg));
 			break;
 		default:
 			printf("%s: illegal option %c\n",argv[0],c);
-			return 4;
+			return 3;
 		}
 	}
 
@@ -1800,10 +1928,10 @@ int main (int argc, char *argv[]) {
 		return 0;
 	}
 	if (fname) {
-		if ((fm = initFormula(fname,bm,lnc)) == NULL) return 5;
+		if ((fm = initFormula(fname,bm,lnc)) == NULL) return 4;
 		if (task == 1) {
 			searchComb(bm,fm,nr,lnc,widlw,a0,a1,b0,b1,start,stop,step,print);
-			return 0;
+			return 5;
 		}
 		linearComb(bm,fm,lnc);
 	}
@@ -1819,10 +1947,20 @@ int main (int argc, char *argv[]) {
 
 
 	if (task == 3) {
-		solveTestEqSingle(fm,radius,phi,start,stop,step);
+		if (prec == 1) solveTestEqSingle(fm,radius,phi,start,stop,step);
+		else if (prec == 2) solveTestEq(fm,radius,phi,start,stop,step);
+		else {
+			printf("%s: illegal precision for -t, only 1 and 2 allowed, your prec=%d\n",argv[0],prec);
+			return 5;
+		}
 		return 0;
 	} else if (task == 4) {
-		solveTestEq(fm,radius,phi,start,stop,step);
+		if (prec == 2) solveRunge(fm,start,stop,step);
+		else if (prec == 3) solveRungeQuad(fm,start,stop,step);
+		else {
+			printf("%s: illegal precision for -u, only 2 and 3 allowed, your prec=%d\n",argv[0],prec);
+			return 6;
+		}
 		return 0;
 	}
 
