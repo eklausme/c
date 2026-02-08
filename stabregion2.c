@@ -27,15 +27,57 @@ extern void zggev_(char *jobvl, char *jobvr, int *n, complex *a, int *lda, compl
 
 
 #define N	75
+#define CPKMAX	17
 #define S	0.0	// Tischer parameter
 
 int debug;
 
 // for LAPACK QZ method
 complex a[N*N], b[N*N], alpha[N], beta[N], work[8*N], vl[N*N], vr[N*N];
-double eps, rwork[8*N];
+double eps, maxlambda=2.3, rwork[8*N];
 int lda=N, ldb=N, ldvl=N, ldvr=N, lwork=N*N, info=0;
 char jobvl[8], jobvr[8];
+
+
+long CpkA[CPKMAX][CPKMAX] = {
+	{ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 },
+	{ 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 },
+	{ 0,1,4,9,16,25,36,49,64,81,100,121,144,169,196,225 },
+	{ 0,1,8,27,64,125,216,343,512,729,1000,1331,1728,2197,2744,3375 },
+	{ 0,1,16,81,256,625,1296,2401,4096,6561,10000,14641,20736,28561,38416,50625 },
+	{ 0,1,32,243,1024,3125,7776,16807,32768,59049,100000,161051,248832,371293,537824,759375 },
+	{ 0,1,64,729,4096,15625,46656,117649,262144,531441,1000000,1771561,2985984,4826809,7529536,11390625 },
+	{ 0,1,128,2187,16384,78125,279936,823543,2097152,4782969,10000000,19487171,35831808,62748517,105413504,170859375 },
+	{ 0,1,256,6561,65536,390625,1679616,5764801,16777216,43046721,100000000,214358881,429981696,815730721,1475789056,2562890625 },
+	{ 0,1,512,19683,262144,1953125,10077696,40353607,134217728,387420489,1000000000,2357947691,5159780352,10604499373,20661046784,38443359375 },
+	{ 0,1,1024,59049,1048576,9765625,60466176,282475249,1073741824,3486784401,10000000000,25937424601,61917364224,137858491849,289254654976,576650390625 },
+	{ 0,1,2048,177147,4194304,48828125,362797056,1977326743,8589934592,31381059609,100000000000,285311670611,743008370688,1792160394037,4049565169664,8649755859375 },
+	{ 0,1,4096,531441,16777216,244140625,2176782336,13841287201,68719476736,282429536481,1000000000000,3138428376721,8916100448256,23298085122481,56693912375296,129746337890625 },
+	{ 0,1,8192,1594323,67108864,1220703125,13060694016,96889010407,549755813888,2541865828329,10000000000000,34522712143931,106993205379072,302875106592253,793714773254144,1946195068359375 },
+	{ 0,1,16384,4782969,268435456,6103515625,78364164096,678223072849,4398046511104,22876792454961,100000000000000,379749833583241,1283918464548864,3937376385699289,11112006825558016,29192926025390625 },
+	{ 0,1,32768,14348907,1073741824,30517578125,470184984576,4747561509943,35184372088832,205891132094649,1000000000000000,4177248169415651,15407021574586368,51185893014090757,155568095557812224,437893890380859375 }
+};
+long CpkB[CPKMAX][CPKMAX] = {
+	{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
+	{ -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1 },
+	{ 0,-2,-4,-6,-8,-10,-12,-14,-16,-18,-20,-22,-24,-26,-28,-30 },
+	{ 0,-3,-12,-27,-48,-75,-108,-147,-192,-243,-300,-363,-432,-507,-588,-675 },
+	{ 0,-4,-32,-108,-256,-500,-864,-1372,-2048,-2916,-4000,-5324,-6912,-8788,-10976,-13500 },
+	{ 0,-5,-80,-405,-1280,-3125,-6480,-12005,-20480,-32805,-50000,-73205,-103680,-142805,-192080,-253125 },
+	{ 0,-6,-192,-1458,-6144,-18750,-46656,-100842,-196608,-354294,-600000,-966306,-1492992,-2227758,-3226944,-4556250 },
+	{ 0,-7,-448,-5103,-28672,-109375,-326592,-823543,-1835008,-3720087,-7000000,-12400927,-20901888,-33787663,-52706752,-79734375 },
+	{ 0,-8,-1024,-17496,-131072,-625000,-2239488,-6588344,-16777216,-38263752,-80000000,-155897368,-286654464,-501988136,-843308032,-1366875000 },
+	{ 0,-9,-2304,-59049,-589824,-3515625,-15116544,-51883209,-150994944,-387420489,-900000000,-1929229929,-3869835264,-7341576489,-13282101504,-23066015625 },
+	{ 0,-10,-5120,-196830,-2621440,-19531250,-100776960,-403536070,-1342177280,-3874204890,-10000000000,-23579476910,-51597803520,-106044993730,-206610467840,-384433593750 },
+	{ 0,-11,-11264,-649539,-11534336,-107421875,-665127936,-3107227739,-11811160064,-38354628411,-110000000000,-285311670611,-681091006464,-1516443410339,-3181801204736,-6343154296875 },
+	{ 0,-12,-24576,-2125764,-50331648,-585937500,-4353564672,-23727920916,-103079215104,-376572715308,-1200000000000,-3423740047332,-8916100448256,-21505924728444,-48594782035968,-103797070312500 },
+	{ 0,-13,-53248,-6908733,-218103808,-3173828125,-28298170368,-179936733613,-893353197568,-3671583974253,-13000000000000,-40799568897373,-115909305827328,-302875106592253,-737020860878848,-1686702392578125 },
+	{ 0,-14,-114688,-22320522,-939524096,-17089843750,-182849716224,-1356446145698,-7696581394432,-35586121596606,-140000000000000,-483317970015034,-1497904875307008,-4240251492291542,-11112006825558016,-27246730957031250 },
+	{ 0,-15,-245760,-71744535,-4026531840,-91552734375,-1175462461440,-10173346092735,-65970697666560,-343151886824415,-1500000000000000,-5696247503748615,-19258776968232960,-59060645785489335,-166680102383370240,-437893890380859375 }
+};
+double fac[CPKMAX] = { 1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,479001600,6227020800,87178291200,1307674368000 };	// fac[i] = i!
+
+
 
 
 typedef struct {
@@ -952,7 +994,31 @@ formula_t F[] = {
 		   0,	   0,	118440,	35280,	171360,
 		   0,	   0,	   0,	229320,	171360,
 		   0,	   0,	   0,	   0,	216720 }
-	}
+	},
+	{
+		"Sloate1", 4, 1, 2,	// name, p, k, l
+		(double[]){
+		-3,  2,
+		 0, -4,
+		 3,  2,
+		// ----
+		 1, -1,
+		 4,  0,
+		 1,  1 }
+	},
+	{
+		"Sloate2", 4, 2, 2,	// name, p, k, l
+		(double[]){
+		 112, -1512,
+		 -72, -1272,
+		 -72,  3216,
+		  32,  -432,
+		// --------
+		 -39,   433,
+		-117,  2795,
+		  27,   851,
+		   9,  -215 }
+	},
 };
 
 #define NF	(sizeof(F) / sizeof(F[0]))
@@ -1138,79 +1204,50 @@ void js3d(int i, complex lambda, double xmin, double widlw) {
 	printf("\t[%.8f, %.8f, 1],\n",creal(lambda),cimag(lambda));
 }
 
-void printFormulas (formula_t F[], int nf) {
-	int i, j, k, l, n, nu, i1, i2, i3, n2, iqm1, q, qfac, flag;
-	double rho1, alphaii, t;
-	long double rho1sum, rho1c, t1, t2, rho1arr[2*N];
+
+
+void printFormulas (formula_t *fm) {
+	int j, k, l, n, q, flag;	// nu, i1, i2, i3, n2, iqm1, qfac,
+	double rho1, alphaii;
 	const char *marker[3] = { "", "\t<-----", "\t<+++++" };
 
-	// Print out all formulas
-	for (i=0; i<nf; ++i) {
-		l = F[i].l;
-		printf("%s, p=%d, k=%d, l=%d\n",F[i].name,F[i].p,F[i].k,l);
-		n = 2 * (F[i].k + l);
-		for (k=0; k<n; ++k) {
-			printf("\t");
-			for (j=0; j<l; ++j)
-				printf("%15.4f",F[i].a[k*l+j]);
-			puts("");
-		}
-		printf("rho_0\t");	// rho(1)=0, that's what it should be
+	l = fm->l;
+	printf("%s, p=%d, k=%d, l=%d\n",fm->name,fm->p,fm->k,l);
+	n = 2 * (fm->k + l);
+	for (k=0; k<n; ++k) {
+		printf("\t");
+		for (j=0; j<l; ++j)
+			printf("%15.4f",fm->a[k*l+j]);
+		puts("");
+	}
+	printf("rho_0\t");	// rho(1)=0, that's what it should be
+	flag = 0;
+	for (j=0; j<l; ++j) {
+		rho1 = 0;
+		n = fm->k + fm->l;
+		for (k=0; k<n; ++k)
+			rho1 += fm->a[k*l+j];
+		if (rho1 != 0) flag = 1;
+		printf("%22.9f",(double)rho1);
+	}
+	puts(flag ? "\t<-----" : "");
+	// Compute consistency check up to the order of the formula
+	for (q=1; q<=fm->p+1; ++q) {
+		printf("rho_%d\t",q);	// rho_q = \sum \alpha_i i^q - q \sum \beta_i i^{q-1}, should be zero
 		flag = 0;
+		n = fm->k + fm->l;
 		for (j=0; j<l; ++j) {
-			rho1 = 0;
-			n = F[i].k + F[i].l;
-			for (k=0; k<n; ++k)
-				rho1 += F[i].a[k*l+j];
-			if (rho1 != 0) flag = 1;
-			printf("%22.9f",(double)rho1);
-		}
-		puts(flag ? "\t<-----" : "");
-		// Compute consistency check up to the order of the formula
-		qfac = 1;	// factorial
-		for (q=1; q<=F[i].p+1; ++q) {
-			qfac *= q;
-			printf("rho_%d\t",q);	// rho_q = \sum \alpha_i i^q - q \sum \beta_i i^{q-1}, should be zero
-			flag = 0;
-			n = F[i].k + F[i].l; n2 = 2 * n;
-			for (j=0; j<l; ++j) {
-				rho1 = 0.0; rho1sum = 0.0;
-				if ((alphaii = F[i].a[(F[i].k+j)*l+j]) == 0) { flag = 2; alphaii = 1; }
-				for (k=0; k<n; ++k) {
-					iqm1 = 1; // iq = 1;
-					for (nu=1; nu<q; ++nu) iqm1 *= k;
-					//iq = iqm1 * k;
-					//rho1 += (long double)F[i].a[k*l+j] * iq - q * (long double)F[i].a[(n+k)*l+j] * iqm1;
-					//rho1 += ((long double)F[i].a[k*l+j] * k - (long double)F[i].a[(n+k)*l+j] * q) * iqm1;
-					//rho1 += ((long double)F[i].a[k*l+j] / alphaii * k - (long double)F[i].a[(n+k)*l+j] / alphaii * q) * iqm1;
-					rho1arr[2*k] = (long double)F[i].a[k*l+j] * (long double)k * (long double)iqm1;
-					rho1arr[2*k+1] = -(long double)F[i].a[(n+k)*l+j] * (long double)q * (long double)iqm1;
-				}
-				for (i1=n2/2; i1>0; i1/=2)	// Shell sort, K&R, §3.5, p.55
-					for (i2=i1; i2<n2; ++i2)
-						for (i3=i2-i1; i3>=0 && fabsl(rho1arr[i3])>fabsl(rho1arr[i3+i1]); i3-=i1) {
-							t = rho1arr[i3];
-							rho1arr[i3] = rho1arr[i3+i1];
-							rho1arr[i3+i1] = t;
-						}
-				//printf(">> ");
-				//for (i1=0; i1<n2; ++i1) printf(" %g",rho1arr[i1]);
-				//printf("\n");
-				rho1c = 0.0;	// Kahan's summation, rho1c is compensation
-				for (i1=0; i1<n2; ++i1) {
-					t1 = rho1arr[i1] - rho1c;
-					t2 = rho1sum + t1;
-					rho1c = (t2 - rho1sum) - t1;
-					rho1sum = t2;
-				}
-				rho1 = rho1sum;
-				if (flag == 0 && rho1 != 0) flag = 1;
-				//printf("<%22.9f,%d,%g>",rho1, qfac, alphaii);
-				printf(" %22.9f",rho1 / qfac / alphaii);
+			rho1 = 0.0;
+			if ((alphaii = fm->a[(fm->k+j)*l+j]) == 0) { flag = 2; alphaii = 1; }
+			for (k=0; k<n; ++k) {
+				rho1 += (long double)fm->a[k*l+j] * CpkA[q][k] + (long double)fm->a[(n+k)*l+j] * CpkB[q][k];
 			}
-			//puts(flag ? "\t<-----" : "");
-			puts(marker[flag]);
+			if (flag == 0 && rho1 != 0) flag = 1;
+			//printf("<%22.9f,%d,%g>",rho1, qfac, alphaii);
+			printf(" %22.9f",rho1 / fac[q] / alphaii);
 		}
+		//puts(flag ? "\t<-----" : "");
+		puts(marker[flag]);
 	}
 }
 
@@ -1352,7 +1389,7 @@ formula_t *initFormula (char *fname, formula_t *bm, double lnc[]) {
 
 
 
-// See https://eklausmeier.goip.de/dyn/blog/2025/01-07-praktische-gewinnung-zyklischer-steif-stabiler-verfahren#Basisformeln
+// See https://eklausmeier.goip.de/blog/2025/01-07-praktische-gewinnung-zyklischer-steif-stabiler-verfahren#Basisformeln
 // Compute fm from bm using lnc[]
 void linearComb (formula_t *bm, formula_t *fm, double lnc[]) {
 	int colLen, cpLen, i, j, k, l=fm->l;
@@ -1368,11 +1405,12 @@ void linearComb (formula_t *bm, formula_t *fm, double lnc[]) {
 	if (debug) {
 		colLen = 2 * (fm->k + fm->l);	// row length of target formula
 		printf("fm based on %s, l=%d, colLen=%d\n",fm->name,fm->l,colLen);
-		for (i=0; i<colLen; ++i) {
-			for (j=0; j<l; ++j)
-				printf("\t%13.8f",fm->a[i*l+j]);
-			printf("\n");
-		}
+		printFormulas(fm);
+		//for (i=0; i<colLen; ++i) {
+		//	for (j=0; j<l; ++j)
+		//		printf("\t%13.8f",fm->a[i*l+j]);
+		//	printf("\n");
+		//}
 	}
 }
 
@@ -1490,7 +1528,7 @@ void lambda3D (int n, int nsq, int nr, double xmin, double xmax, double ymax, do
 				if (beta[j] == 0) continue;
 				//if (cabs(beta[j]) <= eps) continue;
 				abslambda = cabs(alpha[j] / beta[j]);
-				if (abslambda > 2.3) abslambda = 2.3;
+				if (abslambda > maxlambda) abslambda = maxlambda;
 				printf("\t[%.8f, %.8f, %.8f],\n", x, y, abslambda);
 			}
 		}
@@ -1499,11 +1537,38 @@ void lambda3D (int n, int nsq, int nr, double xmin, double xmax, double ymax, do
 
 
 
-void checkLinearComb (formula_t *bm, formula_t *fm, int nr, int il, double lnc[], double widlwMin, double a0[], double a1[],double b0[],double b1[], int *cnt, int print) {
+int checkErrconst(formula_t *fm, double errconst, double *fmerrc) {
+	int k, j, l, n, q;
+	double rho1, alphaii;
+
+	*fmerrc = 0.0;
+	// Compute consistency check up to the order of the formula
+	l = fm->l;
+	for (q=1; q<=fm->p+1; ++q) {
+		n = fm->k + fm->l;
+		for (j=0; j<l; ++j) {
+			rho1 = 0.0;
+			if ((alphaii = fm->a[(fm->k+j)*l+j]) == 0) { alphaii = 1; }
+			for (k=0; k<n; ++k) {
+				rho1 += (long double)fm->a[k*l+j] * CpkA[q][k] + (long double)fm->a[(n+k)*l+j] * CpkB[q][k];
+			}
+			*fmerrc = fmax(*fmerrc,fabs(rho1 / fac[q] / alphaii));
+			if (*fmerrc >  errconst) return 0;
+		}
+	}
+
+	return 1;
+}
+
+
+
+void checkLinearComb (formula_t *bm, formula_t *fm, int nr, int il, double lnc[], double widlwMin, double errconst,
+	double a0[], double a1[],double b0[],double b1[], int *cnt, int print) {
 	int k, n, nsq;
-	double xmin, xmax, ymax, widlw, parasitic;
+	double xmin, xmax, ymax, widlw, parasitic, fmerrc;
 
 	linearComb(bm,fm,lnc);
+	if (errconst > 0 && checkErrconst(fm,errconst,&fmerrc) == 0) return;
 	fillMatrices(fm,a0,a1,b0,b1,&n,&nsq);
 	lda = n, ldb = n, ldvl = n, ldvr = n, lwork = n*n;
 	if (lwork <= 1) lwork = 8;
@@ -1515,7 +1580,7 @@ void checkLinearComb (formula_t *bm, formula_t *fm, int nr, int il, double lnc[]
 		lambdaLocus(n,nsq,nr,widlwMin,a0,a1,b0,b1,&xmin,&xmax,&ymax,&widlw,NULL);
 		if (debug) printf("\twidlw=%f\n",widlw);
 		if (widlw >= widlwMin) {
-			printf("W=%9.5f, xmin=%9.5f, parasitic=%6.4f\t",widlw,xmin,parasitic);
+			printf("W=%9.5f, xmin=%9.5f, parasitic=%6.4f, |e|=%f\t",widlw,xmin,parasitic,fmerrc);
 			for (k=0; k<il; ++k) printf(" %13.6f",lnc[k]);
 			printf("\t\t%d\n",++*cnt);
 		}
@@ -1524,7 +1589,7 @@ void checkLinearComb (formula_t *bm, formula_t *fm, int nr, int il, double lnc[]
 
 
 
-void searchComb (formula_t *bm, formula_t *fm, int nr, double lnc0[], double widlwMin,
+void searchComb (formula_t *bm, formula_t *fm, int nr, double lnc0[], double widlwMin, double errconst,
 	double a0[], double a1[], double b0[], double b1[], double start, double stop, double step, int print) {
 	int i, k, cnt=0, il;
 	double lnc[N * (N+1) / 2 + 4];	// linear combination coefficients
@@ -1539,7 +1604,7 @@ void searchComb (formula_t *bm, formula_t *fm, int nr, double lnc0[], double wid
 			for (k=0; k<il; ++k) printf("%12.4f",lnc[k]);
 			printf("\n");
 		}
-		checkLinearComb(bm,fm,nr,il,lnc,widlwMin,a0,a1,b0,b1,&cnt,print);
+		checkLinearComb(bm,fm,nr,il,lnc,widlwMin,errconst,a0,a1,b0,b1,&cnt,print);
 
 		for (i=il-1; i>=1; --i) {
 			if (lnc[i] < lnc[0] + stop) {
@@ -1556,7 +1621,7 @@ void searchComb (formula_t *bm, formula_t *fm, int nr, double lnc0[], double wid
 
 
 
-void randomComb (formula_t *bm, int nr, int l, int niter, double lnc[], double widlwMin,
+void randomComb (formula_t *bm, int nr, int l, int niter, double lnc[], double widlwMin, double errconst,
 	double a0[], double a1[], double b0[], double b1[], double start, double stop, int print) {
 	int i, j, cnt=0, il;
 	unsigned long seed;
@@ -1602,7 +1667,7 @@ void randomComb (formula_t *bm, int nr, int l, int niter, double lnc[], double w
 	for (i=0; i<niter; ++i) {
 		for (j=1; j<il; ++j)
 			lnc[j] = gsl_ran_flat(r,start,stop);
-		checkLinearComb(bm,fm,nr,il,lnc,widlwMin,a0,a1,b0,b1,&cnt,print);
+		checkLinearComb(bm,fm,nr,il,lnc,widlwMin,errconst,a0,a1,b0,b1,&cnt,print);
 	}
 
 	gsl_rng_free(r);
@@ -1812,10 +1877,10 @@ int main (int argc, char *argv[]) {
 	char cmach[8];
 	formula_t *fm = NULL, *bm = NULL;
 	double lnc[N * (N+1) / 2 + 4];	// linear combination coefficients, lower triangular matrix, initially read from file
-	double xmin, xmax, ymax, widlw=0, a0[N*N], a1[N*N], b0[N*N], b1[N*N], start=-50, stop=50, step=5, radius, phi;
+	double xmin, xmax, ymax, widlw=0, errconst=0, a0[N*N], a1[N*N], b0[N*N], b1[N*N], start=-50, stop=50, step=5, radius, phi;
 	prtf_t prtf = plainOutput;
 
-	while ((c = getopt(argc,argv,"b:f:dhi:I:l:o:r:t:u:W:")) != -1) {
+	while ((c = getopt(argc,argv,"b:E:f:dhi:I:l:L:o:r:t:u:W:")) != -1) {
 		switch(c) {
 		case 'b':	// step numbers of base formulas
 			for (i=0; i<NB; ++i)	// linear search for formula
@@ -1845,8 +1910,9 @@ int main (int argc, char *argv[]) {
 		case 'h':
 			printf("%s: compute stability regions for various formulas.\n"
 			"-b: base formula, Base3-9\n"
-			"-f: formulas: BDF1-6, DonelsonHansen1-6, Mihelcic4-7, Tischer2-8, Tendler3-7, eTendler3-9, Picel2-10, Rubin1-6\n"
+			"-f: formulas: BDF1-6, DonelsonHansen1-6, Mihelcic4-7, Sloate1-2, Tischer2-8, Tendler3-7, eTendler3-9, Picel2-10, Rubin1-6\n"
 			"-d: debug\n"
+			"-E <errconst> max error constant for each stage in linear combination\n"
 			"-h: this help\n"
 			"-I <cycle-length>:<min>:<max>:<max iterations> random search in linear combinations\n"
 			"-i <start>:<stop>:<step> incremental search through linear combinations\n"
@@ -1904,6 +1970,12 @@ int main (int argc, char *argv[]) {
 			task = 4;
 			sscanf(optarg,"%d:%lf:%lf:%lf",&prec,&start,&stop,&step);
 			break;
+		case 'E':
+			errconst = fabs(atof(optarg));
+			break;
+		case 'L':
+			maxlambda = fabs(atof(optarg));
+			break;
 		case 'W':
 			widlw = fabs(atof(optarg));
 			break;
@@ -1924,13 +1996,13 @@ int main (int argc, char *argv[]) {
 
 
 	if (task == 2) {
-		randomComb(bm,nr,cycleLen,niter,lnc,widlw,a0,a1,b0,b1,start,stop,print);
+		randomComb(bm,nr,cycleLen,niter,lnc,widlw,errconst,a0,a1,b0,b1,start,stop,print);
 		return 0;
 	}
 	if (fname) {
 		if ((fm = initFormula(fname,bm,lnc)) == NULL) return 4;
 		if (task == 1) {
-			searchComb(bm,fm,nr,lnc,widlw,a0,a1,b0,b1,start,stop,step,print);
+			searchComb(bm,fm,nr,lnc,widlw,errconst,a0,a1,b0,b1,start,stop,step,print);
 			return 5;
 		}
 		linearComb(bm,fm,lnc);
@@ -1941,7 +2013,7 @@ int main (int argc, char *argv[]) {
 
 	if (debug) {
 		printf("nr=%d, eps=%g\n",nr,eps);
-		printFormulas(F,NF);
+		for (i=0; i<NF; ++i) printFormulas(&F[i]);
 	}
 
 
