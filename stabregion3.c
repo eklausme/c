@@ -36,7 +36,7 @@ int debug;
 
 // for LAPACK QZ method
 complex a[N*N], b[N*N], alpha[N], beta[N], work[8*N], vl[N*N], vr[N*N];
-double eps, maxlambda=2.3, rwork[8*N];
+double eps, omaxlambda=2.3, ominx=0, omaxx=0, omaxy=0, rwork[8*N];
 int lda=N, ldb=N, ldvl=N, ldvr=N, lwork=N*N, info=0;
 char jobvl[8], jobvr[8];
 
@@ -1029,11 +1029,123 @@ formula_t Formula[] = {
 		 -72, -1272,
 		 -72,  3216,
 		  32,  -432,
-		// --------
+		// ---------
 		 -39,   433,
 		-117,  2795,
 		  27,   851,
 		   9,  -215 }
+	},
+	{
+		"MajidOmar", 4, 1, 3,	// name, p, k, l
+		(double[]){
+		 -24,     0,     0,
+		  24,   -24,     0,
+		   0,    24,   -24,
+		   0,     0,    24,
+		// ----------------
+		   9,    -1,     1,
+		  19,    13,    -5,
+		  -5,    13,    19,
+		   1,    -1,     9 }
+	},
+	{
+		// Ibrahim+Nasir+Othman+Suleiman: Block Backward Differentiation Formulas With Automatic Order Selection For Solving ODEs
+		// Formulas are obviously wrong
+		"VOBBDF4", 4, 3, 2,	// name, p, k, l
+		(double[]){
+		  50, -225,
+		-100,  400,
+		 150, -450,
+		  77,  360,
+		 -10,  147,
+		// ---------
+		   0,    0,
+		   0,    0,
+		   0,    0,
+		  60,    0,
+		   0,   60 }
+	},
+	{
+		"VOBBDF5", 5, 4, 2,	// name, p, k, l
+		(double[]){
+		  -3,   12,
+		  20,  -75,
+		 -60,  200,
+		 120, -300,
+		  65,  300,
+		  12,  137,
+		// ---------
+		   0,    0,
+		   0,    0,
+		   0,    0,
+		   0,    0,
+		  60,    0,
+		   0,   16 }
+	},
+	{
+		"VOBBDF6", 6, 5, 2,	// name, p, k, l
+		(double[]){
+		   2,  -10,
+		 -15,   72,
+		  50, -225,
+		-100,  400,
+		 150, -450,
+		  77,  360,
+		 -10,  147,
+		// ---------
+		   0,    0,
+		   0,    0,
+		   0,    0,
+		   0,    0,
+		   0,    0,
+		  60,    0,
+		   0,   60 }
+	},
+	{
+		// Ibrahim+Nasir+Othman+Suleiman: Implicit r-point block BDF for solving 1st stiff ODEs
+		"Ibrahim2", 3, 2, 2,	// name, p, k, l
+		(double[]){
+		   1,   -2,
+		  -6,    9,
+		   3,  -18,
+		   2,   11,
+		// ---------
+		   0,    0,
+		   0,    0,
+		   6,    0,
+		   0,    6 }
+	},
+	{
+		"Ibrahim3", 5, 3, 3,	// name, p, k, l
+		(double[]){
+		  -2,    3,  -12,
+		  15,  -20,   75,
+		 -60,   60, -200,
+		  20, -120,  300,
+		  30,   65, -300,
+		  -3,   12,  137,
+		// --------------
+		   0,    0,    0,
+		   0,    0,    0,
+		   0,    0,    0,
+		  60,    0,    0,
+		   0,   60,    0,
+		   0,    0,   60 }
+	},
+	{
+		"BDF234", 2, 2, 3,	// name, p, k, l
+		(double[]){
+		  1 ,   -2 ,    3,
+		 -4 ,    9 ,  -16,
+		  3 ,  -18 ,   36,
+		  0 ,   11 ,  -48,
+		  0 ,    0 ,   25,
+		// ---------------
+		  0 ,    0 ,    0,
+		  0 ,    0 ,    0,
+		  2 ,    0 ,    0,
+		  0 ,    6 ,    0,
+		  0 ,    0 ,   12 }
 	},
 };
 
@@ -1612,7 +1724,7 @@ void lambda3D (int n, int nsq, int nr, double xmin, double xmax, double ymax, do
 				if (beta[j] == 0) continue;
 				//if (cabs(beta[j]) <= eps) continue;
 				abslambda = cabs(alpha[j] / beta[j]);
-				if (abslambda > maxlambda) abslambda = maxlambda;
+				if (abslambda > omaxlambda) abslambda = omaxlambda;
 				printf("\t[%.8f, %.8f, %.8f],\n", x, y, abslambda);
 			}
 		}
@@ -2033,7 +2145,7 @@ int main (int argc, char *argv[]) {
 		case 'h':
 			printf("%s: compute stability regions for various formulas.\n"
 			"-b: base formula, Base3-9\n"
-			"-f: formulas: BDF1-6, DonelsonHansen1-6, Mihelcic4-7, Sloate1-2, Tischer2-8, Tendler3-7, eTendler3-9, Picel2-10, Rubin1-6\n"
+			"-f: formulas: BDF1-6, DonelsonHansen1-6, Mihelcic4-7, Sloate1-2, Tischer2-8, Tendler3-7, eTendler3-9, Picel2-10, Rubin1-6, MajidOmar, VOBBDF4-6, Ibrahim2-3, BDF234\n"
 			"-d: debug\n"
 			"-E <errconst> max error constant for each stage in linear combination\n"
 			"-h: this help\n"
@@ -2093,7 +2205,8 @@ int main (int argc, char *argv[]) {
 			errconst = fabs(atof(optarg));
 			break;
 		case 'L':
-			maxlambda = fabs(atof(optarg));
+			sscanf(optarg,"%lf:%lf:%lf:%lf",&omaxlambda,&ominx,&omaxx,&omaxy);
+			omaxlambda = fabs(atof(optarg));
 			break;
 		case 'W':
 			widlw = fabs(atof(optarg));
@@ -2165,7 +2278,7 @@ int main (int argc, char *argv[]) {
 	parasiticRoots(n,nsq,a0,a1,print,fm);
 
 	if (nr > 0) {
-		if (outp == 'j' || outp == '3') printf("var data_%s = [\n",fm->name);
+		if (outp == 'j' || outp == '3') printf("var data%s_%s = [\n", (outp=='3'?"2d":""), fm->name);
 
 		lambdaLocus(n,nsq,nr,0.0,a0,a1,b0,b1,&xmin,&xmax,&ymax,&widlw,prtf);
 
@@ -2182,9 +2295,10 @@ int main (int argc, char *argv[]) {
 			fm->name,fm->name,fm->name);
 		else if (outp == '3') {	// 3D output, i.e., stability mountain
 			printf("];\nvar data3d_%s = [\n",fm->name);
-			lambda3D(n,nsq,nr,xmin,xmax,ymax,a0,a1,b0,b1);
+			//lambda3D(n,nsq,nr,xmin,xmax,ymax,a0,a1,b0,b1);
+			lambda3D(n,nsq,nr,ominx?ominx:xmin,omaxx?omaxx:xmax,omaxy?omaxy:ymax,a0,a1,b0,b1);
 			printf("];\n"
-				"var option_%s = {\n"
+				"var option3d_%s = {\n"
 				"\ttooltip: {},\n"
 				"\tvisualMap: {\n"
 				"\t\tshow: false,\n"
@@ -2197,12 +2311,12 @@ int main (int argc, char *argv[]) {
 				"\tgrid3D: { viewControl: { projection:'perspective' } },\n"
 				"\tseries: [\n"
 				"\t\t{ type:'surface', wireframe: { show:true }, data: data3d_%s },\n"
-				"\t\t{ type:'scatter3D', symbolSize:2, data: data_%s }\n"
+				"\t\t{ type:'scatter3D', symbolSize:2, data: data2d_%s }\n"
 				"\t]\n"
 				"}\n"
-				"var chartDom_%s = document.getElementById('container_%s');\n"
-				"var myChart_%s = echarts.init(chartDom_%s);\n"
-				"option_%s && myChart_%s.setOption(option_%s);\n\n",
+				"var chartDom3d_%s = document.getElementById('container3d_%s');\n"
+				"var myChart3d_%s = echarts.init(chartDom3d_%s);\n"
+				"option3d_%s && myChart3d_%s.setOption(option3d_%s);\n\n",
 				fm->name,
 				fm->name,
 				fm->name,
