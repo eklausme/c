@@ -37,11 +37,11 @@ int debug;
 // for LAPACK QZ method
 complex a[N*N], b[N*N], alpha[N], beta[N], work[8*N], vl[N*N], vr[N*N];
 double eps, omaxlambda=2.3, ominx=0, omaxx=0, omaxy=0, rwork[8*N];
-int lda=N, ldb=N, ldvl=N, ldvr=N, lwork=N*N, info=0;
+int lda=N, ldb=N, ldvl=N, ldvr=N, lwork=N*N, info=0, omaxlambdaSet=0;
 char jobvl[8], jobvr[8];
 
 
-long CpkA[CPKMAX][CPKMAX] = {
+long CpkA[CPKMAX][CPKMAX-1] = {
 	{ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 },
 	{ 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 },
 	{ 0,1,4,9,16,25,36,49,64,81,100,121,144,169,196,225 },
@@ -77,7 +77,7 @@ long CpkB[CPKMAX][CPKMAX] = {
 	{ 0,-14,-114688,-22320522,-939524096,-17089843750,-182849716224,-1356446145698,-7696581394432,-35586121596606,-140000000000000,-483317970015034,-1497904875307008,-4240251492291542,-11112006825558016,-27246730957031250 },
 	{ 0,-15,-245760,-71744535,-4026531840,-91552734375,-1175462461440,-10173346092735,-65970697666560,-343151886824415,-1500000000000000,-5696247503748615,-19258776968232960,-59060645785489335,-166680102383370240,-437893890380859375 }
 };
-double fac[CPKMAX] = { 1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,479001600,6227020800,87178291200,1307674368000 };	// fac[i] = i!
+double fac[CPKMAX-1] = { 1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,479001600,6227020800,87178291200,1307674368000 };	// fac[i] = i!
 
 
 
@@ -570,6 +570,44 @@ formula_t Formula[] = {
 		    0,   1845,  20558640,   -156168,
 		    0,      0,   1449972,     20232,
 		    0,      0,         0,      6867 }
+	},
+	{
+		"Hansen5", 5, 3, 3,	// name, p, k, l
+		(double[]){
+		  0,    0,    0,
+		-57, 3249,    0,
+		 24,-1368,    0,
+		 33,-4041,  -57,
+		  0, 2160,   24,
+		  0,    0,   33,
+		// ------------
+		 -1,    0,    0,
+		 24,-1050,    0,
+		 57,-4041,   -1,
+		 10, 1368,   24,
+		  0,  753,   57,
+		  0,    0,   10 }
+	},
+	{
+		"Hansen7", 7, 4, 4,	// name, p, k, l
+		(double[]){
+		    0,       0,     0,           0,
+		-1360,  184960,     0,           0,
+		-1350,  183600,     0,           0,
+		 2160, -992790, -1360,   414984070,
+		  550,  404720, -1350,  1265001840,
+		    0,  219510,  2160, -1380669030,
+		    0,       0,   550,  -446827600,
+		    0,       0,     0,   147510720,
+		// --------------------------------
+		   -9,       0,     0,           0,
+		  456,  -51009,     0,           0,
+		 2376, -374904,    -9,           0,
+		 1656,  149256,   456,  -108800637,
+		  141,  507576,  2376, -1127179512,
+		    0,   59301,  1656, -1155484872,
+		    0,       0,   141,   100081848,
+		    0,       0,     0,    44607033 }
 	},
 	{
 		"Rubin1", 4, 2, 2,	// name, p, k, l
@@ -1147,6 +1185,111 @@ formula_t Formula[] = {
 		  0 ,    6 ,    0,
 		  0 ,    0 ,   12 }
 	},
+	{
+		// England's method according Dana Petcu:
+		// One-Step Methods for the Numerical Solution of Stiff Ordinary Differential Equations
+		"England3", 3, 1, 2,	// name, p, k, l
+		(double[]){
+		  -4,   -4,
+		   9,    0,
+		  -5,    4,
+		// ---------
+		   0,    0,
+		   0,    3,
+		  -2,    1 }
+	},
+	{
+		// van Bokhoven's method according Dana Petcu:
+		// One-Step Methods for the Numerical Solution of Stiff Ordinary Differential Equations
+		"Bokhoven4", 4, 1, 2,	// name, p, k, l
+		(double[]){
+		  -4,   -6,
+		   8,    0,
+		  -4,    6,
+		// ---------
+		   1,    1,
+		   0,    4,
+		  -1,    1 }
+	},
+	{
+		// Petcu's method according Dana Petcu:
+		// One-Step Methods for the Numerical Solution of Stiff Ordinary Differential Equations
+		"Petcu3", 3, 1, 2,	// name, p, k, l
+		(double[]){
+		  -7,   -4,
+		  27,    0,
+		 -20,    4,
+		// ---------
+		   2,    1,
+		   0,    3,
+		  -4,    0 }
+	},
+	{
+		"RK4", 4, 1, 4,	// name, p, k, l
+		(double[]){
+		  -2,  -2,  -1,  -6,
+		   2,   0,   0,   0,
+		   0,   2,   0,   0,
+		   0,   0,   1,   0,
+		   0,   0,   0,   6,
+		// ------------------------
+		   1,   0,   0,   1,
+		   0,   1,   0,   2,
+		   0,   0,   1,   2,
+		   0,   0,   0,   1,
+		   0,   0,   0,   0 }
+	},
+	{
+		"Fredebeul3", 3, 3, 3,	// name, p, k, l
+		(double[]){
+		 12,  12,  12,
+		  0,   0,   0,
+		-72, -72, -72,
+		 60,   0,   0,
+		  0,  60,   0,
+		  0,   0,  60,
+		// -----------
+		 -9, -14, -19,
+		 -6,   4,  14,
+		 21,  16,  11,
+		 30,  60,  60,
+		  0,  30,  60,
+		  0,   0,  30 }
+	},
+	{
+		"Fredebeul4", 4, 3, 3,	// name, p, k, l
+		(double[]){
+		 300,  300,  300,
+		   0,    0,    0,
+		-900, -900, -900,
+		 600,    0,    0,
+		   0,  600,    0,
+		   0,    0,  600,
+		// --------------
+		 -75,    0,  113,
+		-525, -800,-1132,
+		 375,  700,  923,
+		 225,  400,  543,
+		   0,  300,  408,
+		   0,    0,  345 }
+	},
+	{
+		"Fredebeul3p", 3, 3, 3,	// name, p, k, l (parallel Newton version)
+		(double[]){
+		 30,  30,  30,
+		  0,   0,   0,
+		-90, -90, -90,
+		 60,   0,   0,
+		  0,  60,   0,
+		  0,   0,  60,
+		// -----------
+		 -3,  40,  71,
+		-66,-200,-310,
+		 51, 190, 305,
+		 18,   0,   0,
+		  0,  30,   0,
+		  0,   0,  54 }
+	},
 };
 
 #define NF	(sizeof(Formula) / sizeof(Formula[0]))
@@ -1382,7 +1525,7 @@ void printFormulas (formula_t *fm) {
 
 
 // Fill the four square A0, A1 and B1, B2 matrices: A1 y(yn+1) + A0 y(n) = B1 z(n+1) + B0 z(n)
-// Matrices in column order, i.e., Fortran mode for later use by zzgev_
+// Matrices in column order, i.e., Fortran mode for later use by zggev_
 void fillMatrices (formula_t *fm, double a0[], double a1[], double b0[], double b1[], int *nOut, int *nsqOut) {
 	int colLen, i, j, n, nsq, nrest, rest;
 
@@ -1612,7 +1755,7 @@ void linearComb (linComb_t *lc, formula_t *fm) {
 
 
 
-void parasiticRoots (int n, int nsq, double a0[], double a1[], int print, formula_t *fm) {
+void parasiticRoots (int n, int nsq, double a0[], double a1[], int print, formula_t *fm, const char outp[]) {
 	int i, j, nu;
 	double lambdaLen;
 	complex lambda;
@@ -1623,7 +1766,7 @@ void parasiticRoots (int n, int nsq, double a0[], double a1[], int print, formul
 		b[j] = 0 - a1[j];
 	info = 0;
 	zggev_(jobvl, jobvr, &n, a, &lda, b, &ldb, alpha, beta, vl, &ldvl, vr, &ldvr, work, &lwork, rwork, &info);
-	if (info) printf("parasitic roots: zggev_.info=%d\n",info);
+	if (info) printf("%s: zggev_.info=%d\n",outp,info);
 	for (j=0; j<n; ++j)
 		if (beta[j] == 0) alpha[j] = 0, rwork[j] = 0, rwork[j] = 0;	// illegal
 		else alpha[j] /= beta[j], rwork[j] = cabs(alpha[j]);	// alpha = eigenvalue, rwork = absolute value
@@ -1639,9 +1782,11 @@ void parasiticRoots (int n, int nsq, double a0[], double a1[], int print, formul
 			}
 
 	if (print) {
-		printf("Parasitic roots of %s\n\t%-5s\t%-16s\t%-16s\t%-16s\t%d-th root\n",fm->name,"nr","real","imag","abs",fm->l);
+		printf("%s of %s\n\t%-5s\t%-16s\t%-16s\t%-16s\t%d-th root\n",
+			outp,fm->name,"nr","real","imag","abs",fm->l);
 		for (j=0; j<n; ++j)
-			printf("\t%5d%16.8f\t%16.8f\t%16.8f\t%18.8f\n",j,creal(alpha[j]),cimag(alpha[j]),rwork[j],pow(rwork[j],1.0/fm->l));
+			printf("\t%5d%16.8f\t%16.8f\t%16.8f\t%18.8f\n",
+				j,creal(alpha[j]),cimag(alpha[j]),rwork[j],pow(rwork[j],1.0/fm->l));
 	}
 }
 
@@ -1654,6 +1799,8 @@ void lambdaLocus (int n, int nsq, int nr, double widlwMin, double a0[], double a
 	double phi, phiinc, rlambda, ilambda;
 	complex eiphi, lambda;
 
+	if (debug && omaxlambdaSet) printf("omaxlambda=%g, xmin=%g, xmax=%g, ymax=%g, omaxlambdaSet=%d, ominx=%g, omaxx=%g, omaxy=%g\n",
+		omaxlambda,xmin,xmax,ymax,omaxlambdaSet,ominx,omaxx,omaxy);
 	for (i=0,phiinc=2*M_PI/nr,phi=0; i<nr; phi+=phiinc,++i) {
 		eiphi = cexp(I * phi);
 		for (j=0; j<nsq; ++j)	// A = A1 e^{i\phi} + A0, same for B
@@ -1673,7 +1820,11 @@ void lambdaLocus (int n, int nsq, int nr, double widlwMin, double a0[], double a
 			if (rlambda < 0
 			&&  fabs(rlambda) > eps && fabs(ilambda) > eps)
 				widlw = fmin(widlw,180/M_PI*fabs(atan(ilambda/rlambda)));	// Widlund wedge in degrees
-			if (prtf) prtf(i,lambda,xmin,widlw);
+			if (prtf) {
+				//printf(">> xmin=%g, ominx=%g, xmax=%g, omaxx=%g, ymax=%g, omaxy=%g\n", xmin,ominx,xmax,omaxx,ymax,omaxy);
+				if (!omaxlambdaSet || (rlambda>ominx && rlambda<omaxx && fabs(ilambda)<omaxy))
+					prtf(i,lambda,xmin,widlw);
+			}
 			if (widlwMin > 0 && widlw < widlwMin) goto L;
 		}
 	}
@@ -1689,11 +1840,18 @@ L:
 
 void lambda3D (int n, int nsq, int nr, double xmin, double xmax, double ymax, double a0[], double a1[], double b0[], double b1[]) {
 	int j;
-	double x, y, xstep, ystep, abslambda;
+	double x, y, z, xstep, ystep, abslambda;
 
-	xmin = -1.4 * fmax(fabs(xmin),xmax),
-	xmax = 1.1 * xmax,
-	ymax = 1.1 * ymax,
+	if (debug) printf("omaxlambda=%g, xmin=%g, xmax=%g, ymax=%g\n",omaxlambda,xmin,xmax,ymax);
+	if (omaxlambdaSet) {
+		xmin = ominx,
+		xmax = omaxx,
+		ymax = omaxy;
+	} else {
+		xmin = -1.4 * fmax(fabs(xmin),xmax),
+		xmax = 1.1 * xmax,
+		ymax = 1.1 * ymax;
+	}
 	nr = 4.1 * sqrt(nr);
 	xstep = (xmax - xmin) / nr, ystep = 2 * ymax / nr;
 
@@ -1702,6 +1860,23 @@ void lambda3D (int n, int nsq, int nr, double xmin, double xmax, double ymax, do
 			for (j=0; j<nsq; ++j)
 				a[j] = a0[j] - (x+I*y) * b0[j],
 				b[j] = (x+I*y) * b1[j] - a1[j];
+			info = 0;
+			zggev_(jobvl, jobvr, &n, a, &lda, b, &ldb, alpha, beta, vl, &ldvl, vr, &ldvr, work, &lwork, rwork, &info);
+			if (info) printf("zggev_.info=%d\n",info);
+			z = 0;
+			for (j=0; j<n; ++j) {
+				if (beta[j] == 0) continue;
+				//if (cabs(beta[j]) <= eps) continue;
+				abslambda = cabs(alpha[j] / beta[j]);
+				if (abslambda > omaxlambda) { z = omaxlambda; break; }
+				if (abslambda > z) z = abslambda;
+			}
+			printf("\t[%.8f, %.8f, %.8f],\n", x, y, z);
+		}
+	}
+}
+
+/* * *
 #if 0
 			for (i=0; i<n; ++i) {
 				printf("\t\t");
@@ -1716,9 +1891,6 @@ void lambda3D (int n, int nsq, int nr, double xmin, double xmax, double ymax, do
 				printf("\n");
 			}
 #endif
-			info = 0;
-			zggev_(jobvl, jobvr, &n, a, &lda, b, &ldb, alpha, beta, vl, &ldvl, vr, &ldvr, work, &lwork, rwork, &info);
-			if (info) printf("zggev_.info=%d\n",info);
 			for (j=0; j<n; ++j) {
 				//printf("alpha[%d]=(%.6f,%.6f), beta[%d]=(%.6f,%.6f)\n",j,creal(alpha[j]),cimag(alpha[j]),j,creal(beta[j]),cimag(beta[j]));
 				if (beta[j] == 0) continue;
@@ -1727,10 +1899,7 @@ void lambda3D (int n, int nsq, int nr, double xmin, double xmax, double ymax, do
 				if (abslambda > omaxlambda) abslambda = omaxlambda;
 				printf("\t[%.8f, %.8f, %.8f],\n", x, y, abslambda);
 			}
-		}
-	}
-}
-
+* * */
 
 
 int checkErrconst(formula_t *fm, double errconst, double *fmerrc) {
@@ -1769,7 +1938,7 @@ void checkLinearComb (linComb_t *lc, formula_t *fm, int nr, double widlwMin, dou
 	lda = n, ldb = n, ldvl = n, ldvr = n, lwork = n*n;
 	if (lwork <= 1) lwork = 8;
 
-	parasiticRoots(n,nsq,a0,a1,0,fm);
+	parasiticRoots(n,nsq,a0,a1,0,fm,"parasitic roots");
 	if (debug) printf("rwork[0]=%f, rwork[1]=%f\n",rwork[0],rwork[1]);
 	if (rwork[0] <= 1.0 && n>1 && rwork[1] <= 0.75 && nr > 0) {
 		parasitic = rwork[1];
@@ -2145,12 +2314,16 @@ int main (int argc, char *argv[]) {
 		case 'h':
 			printf("%s: compute stability regions for various formulas.\n"
 			"-b: base formula, Base3-9\n"
-			"-f: formulas: BDF1-6, DonelsonHansen1-6, Mihelcic4-7, Sloate1-2, Tischer2-8, Tendler3-7, eTendler3-9, Picel2-10, Rubin1-6, MajidOmar, VOBBDF4-6, Ibrahim2-3, BDF234\n"
+			"-f: formulas: BDF1-6, DonelsonHansen1-6, Hansen5, Hansen7, Mihelcic4-7, Sloate1-2,\n"
+			"    Tischer2-8, Tendler3-7, eTendler3-9,\n"
+			"    Picel2-10, Rubin1-6, MajidOmar, VOBBDF4-6, Ibrahim2-3, BDF234, England3, Bokhoven4, Petcu4, RK4\n"
+			"    Fredebeul3,4,3p\n"
 			"-d: debug\n"
 			"-E <errconst> max error constant for each stage in linear combination\n"
 			"-h: this help\n"
 			"-I <cycle-length>:<min>:<max>:<max iterations> random search in linear combinations\n"
 			"-i <start>:<stop>:<step> incremental search through linear combinations\n"
+			"-L <maxLambda>:<minX>:<maxX>:<maxY> cutoff for plotting\n"
 			"-l: file name with linear combinations for the base formula\n"
 			"-o: output format in either 'p' (plain) or 'j' (Javascript) or '3' (3-dimensional)\n"
 			"-r: number of records\n"
@@ -2205,8 +2378,10 @@ int main (int argc, char *argv[]) {
 			errconst = fabs(atof(optarg));
 			break;
 		case 'L':
+			omaxlambdaSet = 1;
 			sscanf(optarg,"%lf:%lf:%lf:%lf",&omaxlambda,&ominx,&omaxx,&omaxy);
-			omaxlambda = fabs(atof(optarg));
+			omaxlambda = fabs(omaxlambda);
+			if (ominx >= omaxx) printf("ominx=%g greater or equal to omaxx=%g\n",ominx,omaxx);
 			break;
 		case 'W':
 			widlw = fabs(atof(optarg));
@@ -2275,7 +2450,8 @@ int main (int argc, char *argv[]) {
 	lda = n, ldb = n, ldvl = n, ldvr = n, lwork = n*n;
 	if (lwork <= 1) lwork = 8;
 
-	parasiticRoots(n,nsq,a0,a1,print,fm);
+	parasiticRoots(n,nsq,a0,a1,outp=='p'?print:0,fm,"parasitic roots");
+	parasiticRoots(n,nsq,b0,b1,outp=='p'?print:0,fm,"radius at infinity");
 
 	if (nr > 0) {
 		if (outp == 'j' || outp == '3') printf("var data%s_%s = [\n", (outp=='3'?"2d":""), fm->name);
@@ -2295,8 +2471,7 @@ int main (int argc, char *argv[]) {
 			fm->name,fm->name,fm->name);
 		else if (outp == '3') {	// 3D output, i.e., stability mountain
 			printf("];\nvar data3d_%s = [\n",fm->name);
-			//lambda3D(n,nsq,nr,xmin,xmax,ymax,a0,a1,b0,b1);
-			lambda3D(n,nsq,nr,ominx?ominx:xmin,omaxx?omaxx:xmax,omaxy?omaxy:ymax,a0,a1,b0,b1);
+			lambda3D(n,nsq,nr,xmin,xmax,ymax,a0,a1,b0,b1);
 			printf("];\n"
 				"var option3d_%s = {\n"
 				"\ttooltip: {},\n"
