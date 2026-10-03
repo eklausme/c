@@ -1924,6 +1924,8 @@ void lambda3D (int n, int nsq, int nr, double xmin, double xmax, double ymax, do
 	}
 	nr = 4.1 * sqrt(nr);
 	xstep = (xmax - xmin) / nr, ystep = 2 * ymax / nr;
+	if (xstep == 0.0) xstep = 1.0;
+	if (ystep == 0.0) ystep = 1.0;
 
 	for (x=xmin; x<=xmax; x+=xstep) {
 		for (y=-ymax; y<=ymax; y+=ystep) {
